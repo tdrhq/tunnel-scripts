@@ -101,16 +101,21 @@ int main()
 			perror ("read");
 		
 		s = read (tun, ar, iphdr.tot_len - sizeof(iphdr));
-		data = ar + iphdr.ihl - sizeof(iphdr);
+		data = ar + iphdr.ihl*4 - sizeof(iphdr);
 
 		/* good, we now got the data */
 
 		/* first test, if this is not TCP, discard */
-		if (iphdr.protocol != 6) continue;
+		if (iphdr.protocol != 6) {
+			fprintf (stderr, "Packet discarded\n");
+			continue;
+		}
 
-
-		for(i = 0; i < s; i++) {
-			printf("%c", ar[i]);
+		fprintf (stderr, "Packet of size %d going through!\n", (int)iphdr.tot_len);
+		
+		int datalen = iphdr.tot_len - iphdr.ihl*4;
+		for(i = 0; i < datalen; i++) {
+			printf("%c", data[i]);
 			fflush (stdout);
 		}
 		fprintf(stderr, "here %d\n", (int)s);
