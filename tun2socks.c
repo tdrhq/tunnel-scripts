@@ -1,3 +1,18 @@
+#define _POSIX_SOURCE /* for kill */
+
+#include <assert.h>
+#include <errno.h>
+#include <mqueue.h>
+#include <semaphore.h>
+#include <signal.h>
+#include <stdio.h> 
+#include <stdlib.h>
+#include <string.h>
+#include <sys/wait.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -11,6 +26,7 @@
 #include <signal.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
+#include <mqueue.h>
 
 mqd_t mq = 1; 
 char mq_name [128];
@@ -84,8 +100,8 @@ int main()
 		if (s == -1) 
 			perror ("read");
 		
-		s = read (tun, ar, iphdr.ip_len - sizeof(iphdr));
-		data = ar + iphdr.ip_hl - sizeof(iphdr);
+		s = read (tun, ar, iphdr.tot_len - sizeof(iphdr));
+		data = ar + iphdr.ihl - sizeof(iphdr);
 
 		/* good, we now got the data */
 

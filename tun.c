@@ -1,3 +1,9 @@
+
+#include <features.h>
+#define __USE_MISC
+#ifndef __USE_MISC
+#error woah
+#endif
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -7,12 +13,10 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <linux/if_tun.h>
-#include <mqueue.h>
-#include <signal.h>
+#include <net/if.h>
+#include <unistd.h>
 
-#include <linux/ip.h>
-
-int tun_alloc(char *dev);
+int tun_alloc(char *dev)
 {
 	struct ifreq ifr;
 	int fd, err;
