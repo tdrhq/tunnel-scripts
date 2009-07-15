@@ -1,4 +1,5 @@
 #define _POSIX_SOURCE /* for kill */
+#define __USE_MISC
 
 #include <assert.h>
 #include <errno.h>
@@ -24,8 +25,8 @@
 #include <linux/if_tun.h>
 #include <mqueue.h>
 #include <signal.h>
-#include <netinet/ip.h>
-#include <netinet/tcp.h>
+#include <netinet/in.h>
+#include "tcpip.h"
 #include <mqueue.h>
 
 mqd_t mq = 1; 
@@ -90,6 +91,8 @@ int main()
 
 	while (1) {
 		struct iphdr iphdr;
+		struct tcphdr tcphdr;
+
 		char ar[100000];
 		char *data;
 		int i;
@@ -99,9 +102,12 @@ int main()
 		s = read (tun, &iphdr, sizeof(iphdr));
 		if (s == -1) 
 			perror ("read");
+
+		fprintf (stderr, "Packet of size %d going through to %d!\n", (int) ntohs(iphdr.tot_len),
+			 (int) iphdr.daddr);
 		
-		s = read (tun, ar, iphdr.tot_len - sizeof(iphdr));
-		data = ar + iphdr.ihl*4 - sizeof(iphdr);
+		s = read (tun, ar, ntohs(iphdr.tot_len) - sizeof(iphdr));
+		data = ar + (iphdr.ihl)*4 - sizeof(iphdr);
 
 		/* good, we now got the data */
 
@@ -111,9 +117,12 @@ int main()
 			continue;
 		}
 
-		fprintf (stderr, "Packet of size %d going through!\n", (int)iphdr.tot_len);
+		memcpy (&tcphdr, data, sizeof(tcphdr));
+
+		fprintf (stderr, "with dest port %d!\n",(int) ntohs(tcphdr.dest));
 		
-		int datalen = iphdr.tot_len - iphdr.ihl*4;
+		int datalen = ntohs(iphdr.tot_len) - (iphdr.ihl)*4;
+		fprintf(stderr, "tcp len: %d\n", (int) datalen);
 		for(i = 0; i < datalen; i++) {
 			printf("%c", data[i]);
 			fflush (stdout);
