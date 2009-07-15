@@ -76,6 +76,7 @@ int main()
 	int data;
 	char stun[100] = "tun0";
 	int tun = tun_alloc (stun);
+	FILE *ftun = fdopen (tun, "r");
 
 	sprintf (mq_name, "/mqq_%d", getpid());
 	mq = mq_open (mq_name,  O_RDONLY|O_CREAT|O_EXCL, S_IRWXU, NULL);
@@ -99,14 +100,14 @@ int main()
 		
 		ssize_t s;
 
-		s = read (tun, &iphdr, sizeof(iphdr));
+		s = fread (&iphdr, sizeof(iphdr), 1, ftun);
 		if (s == -1) 
 			perror ("read");
 
-		fprintf (stderr, "Packet of size %d going through to %d!\n", (int) ntohs(iphdr.tot_len),
-			 (int) iphdr.daddr);
+		fprintf (stderr, "Packet of size %d going through to %d! (%d, %d)\n", (int) ntohs(iphdr.tot_len),
+			 (int) iphdr.daddr, (int) sizeof(iphdr), iphdr.ihl);
 		
-		s = read (tun, ar, ntohs(iphdr.tot_len) - sizeof(iphdr));
+		s = fread (ar, ntohs(iphdr.tot_len) - sizeof(iphdr), 1, ftun);
 		data = ar + (iphdr.ihl)*4 - sizeof(iphdr);
 
 		/* good, we now got the data */
@@ -124,7 +125,7 @@ int main()
 		int datalen = ntohs(iphdr.tot_len) - (iphdr.ihl)*4;
 		fprintf(stderr, "tcp len: %d\n", (int) datalen);
 		for(i = 0; i < datalen; i++) {
-			printf("%c", data[i]);
+			printf(" %c", data[i]);
 			fflush (stdout);
 		}
 		fprintf(stderr, "here %d\n", (int)s);
