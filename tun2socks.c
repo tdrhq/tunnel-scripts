@@ -72,7 +72,7 @@ void message_queue (int fd)
 	}
 }
 
-void read_tun ()
+void read_tun (FILE *ftun)
 {
 	struct iphdr iphdr;
 	struct tcphdr tcphdr;
@@ -98,7 +98,7 @@ void read_tun ()
 	/* first test, if this is not TCP, discard */
 	if (iphdr.protocol != 6) {
 		fprintf (stderr, "Packet discarded\n");
-		continue;
+		return;
 	}
 	
 	memcpy (&tcphdr, data, sizeof(tcphdr));
@@ -111,7 +111,9 @@ void read_tun ()
 		printf(" %c", data[i]);
 		fflush (stdout);
 	}
-	fprintf(stderr, "here %d\n", (int)s);
+	fprintf(stderr, "\nhere %d\n", (int)s);
+
+	/* do some quick hacks */
 }
 
 int main() 
@@ -134,9 +136,7 @@ int main()
 	fprintf(stderr, "listening on %s\n", stun);
 
 	while (1) {
-
-		
-		read_tun ();
+		read_tun (ftun);
 	}
 	fgetc(stdin);
 }
