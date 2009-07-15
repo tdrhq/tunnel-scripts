@@ -35,6 +35,7 @@ char mq_name [128];
 
 int tun_alloc (char*);
 
+
 /**
  * cleanup code. 
  */
@@ -71,6 +72,48 @@ void message_queue (int fd)
 	}
 }
 
+void read_tun ()
+{
+	struct iphdr iphdr;
+	struct tcphdr tcphdr;
+	
+	char ar[100000];
+	char *data;
+	int i;
+	
+	ssize_t s;
+	
+	s = fread (&iphdr, sizeof(iphdr), 1, ftun);
+	if (s == -1) 
+		perror ("read");
+	
+	fprintf (stderr, "Packet of size %d going through to %d! (%d, %d)\n", (int) ntohs(iphdr.tot_len),
+		 (int) iphdr.daddr, (int) sizeof(iphdr), iphdr.ihl);
+	
+	s = fread (ar, ntohs(iphdr.tot_len) - sizeof(iphdr), 1, ftun);
+	data = ar + (iphdr.ihl)*4 - sizeof(iphdr);
+	
+	/* good, we now got the data */
+	
+	/* first test, if this is not TCP, discard */
+	if (iphdr.protocol != 6) {
+		fprintf (stderr, "Packet discarded\n");
+		continue;
+	}
+	
+	memcpy (&tcphdr, data, sizeof(tcphdr));
+	
+	fprintf (stderr, "with dest port %d!\n",(int) ntohs(tcphdr.dest));
+	
+	int datalen = ntohs(iphdr.tot_len) - (iphdr.ihl)*4;
+	fprintf(stderr, "tcp len: %d\n", (int) datalen);
+	for(i = 0; i < datalen; i++) {
+		printf(" %c", data[i]);
+		fflush (stdout);
+	}
+	fprintf(stderr, "here %d\n", (int)s);
+}
+
 int main() 
 {
 	int data;
@@ -91,44 +134,9 @@ int main()
 	fprintf(stderr, "listening on %s\n", stun);
 
 	while (1) {
-		struct iphdr iphdr;
-		struct tcphdr tcphdr;
 
-		char ar[100000];
-		char *data;
-		int i;
 		
-		ssize_t s;
-
-		s = fread (&iphdr, sizeof(iphdr), 1, ftun);
-		if (s == -1) 
-			perror ("read");
-
-		fprintf (stderr, "Packet of size %d going through to %d! (%d, %d)\n", (int) ntohs(iphdr.tot_len),
-			 (int) iphdr.daddr, (int) sizeof(iphdr), iphdr.ihl);
-		
-		s = fread (ar, ntohs(iphdr.tot_len) - sizeof(iphdr), 1, ftun);
-		data = ar + (iphdr.ihl)*4 - sizeof(iphdr);
-
-		/* good, we now got the data */
-
-		/* first test, if this is not TCP, discard */
-		if (iphdr.protocol != 6) {
-			fprintf (stderr, "Packet discarded\n");
-			continue;
-		}
-
-		memcpy (&tcphdr, data, sizeof(tcphdr));
-
-		fprintf (stderr, "with dest port %d!\n",(int) ntohs(tcphdr.dest));
-		
-		int datalen = ntohs(iphdr.tot_len) - (iphdr.ihl)*4;
-		fprintf(stderr, "tcp len: %d\n", (int) datalen);
-		for(i = 0; i < datalen; i++) {
-			printf(" %c", data[i]);
-			fflush (stdout);
-		}
-		fprintf(stderr, "here %d\n", (int)s);
+		read_tun ();
 	}
 	fgetc(stdin);
 }
