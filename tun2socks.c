@@ -72,6 +72,31 @@ void message_queue (int fd)
 	}
 }
 
+void send_syn_ack (FILE *ftun, struct iphdr iphdr, struct tcphdr tcphdr) 
+{
+	int temp = iphdr.daddr;
+	iphdr.daddr = iphdr.saddr;
+	iphdr.saddr = temp;
+
+
+	fwrite (&iphdr, sizeof(iphdr), 1, ftun);
+
+	/* options? */
+	char options[100];
+	memset (options, 0, sizeof(options));
+	fwrite (options, iphdr.ihl - sizeof(iphdr), 1, ftun);
+
+	/* build tcphdr */
+	temp = tcphdr.source;
+	tcphdr.source = tcphdr.dest;
+	tcphdr.dest = temp;
+
+	tcphdr.ack_seq = tcphdr.seq + 1;
+	tcphdr.ack = 1;
+	
+
+}
+
 void read_tun (FILE *ftun)
 {
 	struct iphdr iphdr;
@@ -96,7 +121,7 @@ void read_tun (FILE *ftun)
 	/* good, we now got the data */
 	
 	/* first test, if this is not TCP, discard */
-	if (iphdr.protocol != 6) {
+	if (iphdr.protocol != 6 && iphdr.protocol != 17) {
 		fprintf (stderr, "Packet discarded\n");
 		return;
 	}

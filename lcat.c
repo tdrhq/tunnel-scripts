@@ -105,6 +105,19 @@ void acceptconn (int servfd)
 	}
 }
 
+void end_conn (int fd)
+{
+	int otherend = local2gw[fd]? local2gw[fd] : gw2local[fd];
+	shutdown (fd, SHUT_RDWR);
+	shutdown (otherend, SHUT_RDWR);
+	close (fd);
+	close (otherend);
+	local2gw[fd] = gw2local[fd] = 0;
+	local2gw[otherend] = gw2local[otherend] = 0;
+	fprintf (stderr, "A connection was closed\n");
+}
+
+#define BUF_SIZE  4000
 int main()
 {
 	int servfd = server ();
@@ -116,15 +129,35 @@ int main()
 	for (;;) {
 		int nfds = servfd;
 		fd_set rd = build_all (&nfds);
-		fd_set wr = build_all (&nfds);
-		fd_set er = build_all (&nfds);
+		fd_set wr;
+		fd_set er;
 		FD_SET (servfd, &rd);
-
+		FD_ZERO (&wr);
+		FD_ZERO (&er);
 
 		int r = select (nfds + 1, &rd, &wr, &er, NULL);
 
 		if (FD_ISSET (servfd, &rd)) {
 			acceptconn (servfd);
+		}
+
+		for (int i = 0; i < (1<<16); i++) {
+			if ((local2gw[i] || gw2local[i]) && FD_ISSET (i, &rd)) {
+				int ws = (local2gw[i] ? local2gw[i] : gw2local[i]);
+				char buf [BUF_SIZE];
+				int len = read (i, buf, sizeof(buf));
+				if (len < 1) {
+					end_conn (ws);
+					continue;
+				}
+
+				len = write (ws, buf, len);
+				if (len < 1) {
+					end_conn (ws);
+					continue;
+				}
+
+			}
 		}
 	}
 }
