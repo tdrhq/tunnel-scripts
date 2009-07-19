@@ -1,0 +1,130 @@
+#include <stdio.h>
+#include <stdlib.h>
+       #include <unistd.h>
+       #include <sys/time.h>
+       #include <sys/types.h>
+       #include <string.h>
+       #include <signal.h>
+       #include <sys/socket.h>
+       #include <netinet/in.h>
+       #include <arpa/inet.h>
+       #include <errno.h>
+#include <netinet/in.h>
+#include <netdb.h>
+
+int localport = 8000;
+char *gateway = "eniac.seas.upenn.edu";
+int gatewayport = 22;
+
+int client2gw ()
+{
+	/* create client socket */
+	int  clientfd = socket(AF_INET, SOCK_STREAM, 0);
+	struct hostent *server;
+	struct sockaddr_in servaddr;
+
+	if (clientfd < 0)
+		perror ("Client Socket");
+
+	server = gethostbyname (gateway);
+	if (server == NULL) 
+		exit (1);
+
+	memset (&servaddr, 0, sizeof(servaddr));
+	servaddr.sin_family = AF_INET;
+	memcpy ((char*)&servaddr.sin_addr.s_addr, (char*)server->h_addr_list[0], server->h_length);
+
+	servaddr.sin_port = htons (gatewayport);
+
+	if (connect (clientfd, (struct sockaddr*)&servaddr, sizeof(servaddr)) < 0) {
+		perror ("Client connect");
+		exit (0);
+	}
+
+	return clientfd;
+}
+
+int server ()
+{
+	int fd = socket (AF_INET, SOCK_STREAM, 0);
+	struct sockaddr_in addr;
+	
+	if (fd < 0) {
+		perror ("server1");
+		exit (1);
+	}
+
+	addr.sin_family = AF_INET;
+	addr.sin_addr.s_addr = INADDR_ANY;
+	addr.sin_port = htons(localport);
+
+	if (bind (fd, (struct sockaddr*) &addr, sizeof(addr)) < 0) {
+		perror ("bind");
+		exit(1);
+	}
+	listen (fd, 10);
+
+	return fd;
+}
+
+int local2gw [1<<16];
+int gw2local [1<<16];
+
+
+fd_set build_all (int *nfds) 
+{
+	fd_set d;
+
+	FD_ZERO (&d);
+	for (int i = 0; i < (1<<16); i++) {
+		if (local2gw [i] || gw2local[i]) 
+			FD_SET(i, &d);
+		*nfds = (*nfds < i ? i : *nfds);
+	}
+	return d;
+}
+
+
+void acceptconn (int servfd)
+{
+	int r = accept (servfd, NULL, NULL);
+	if (r < 0) {
+		perror ("Accept failed");
+		return;
+	} else {
+		int g = client2gw ();
+		if (g < 0) {
+			perror ("connect failed");
+			return;
+		}
+		
+		local2gw [r] = g;
+		gw2local [g] = r;
+		
+		fprintf (stderr, "Conn accepted\n");
+	}
+}
+
+int main()
+{
+	int servfd = server ();
+
+	
+	memset (local2gw, 0, sizeof (local2gw));
+	memset (gw2local, 0, sizeof (gw2local));
+
+	for (;;) {
+		int nfds = servfd;
+		fd_set rd = build_all (&nfds);
+		fd_set wr = build_all (&nfds);
+		fd_set er = build_all (&nfds);
+		FD_SET (servfd, &rd);
+
+
+		int r = select (nfds + 1, &rd, &wr, &er, NULL);
+
+		if (FD_ISSET (servfd, &rd)) {
+			acceptconn (servfd);
+		}
+	}
+}
