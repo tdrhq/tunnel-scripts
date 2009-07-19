@@ -12,9 +12,10 @@
 #include <netinet/in.h>
 #include <netdb.h>
 
-int localport = 8000;
+int localport = 8001;
 char *gateway = "eniac.seas.upenn.edu";
 int gatewayport = 22;
+int speed = 80000;
 
 int client2gw ()
 {
@@ -132,6 +133,8 @@ int main()
 		fd_set wr;
 		fd_set er;
 		FD_SET (servfd, &rd);
+		FD_SET (0, &rd);
+
 		FD_ZERO (&wr);
 		FD_ZERO (&er);
 
@@ -139,6 +142,17 @@ int main()
 
 		if (FD_ISSET (servfd, &rd)) {
 			acceptconn (servfd);
+		}
+
+		if (FD_ISSET (0, &rd)) {
+			char s [1000];
+			fgets (s, sizeof(s), stdin);
+			if (atoi(s) == 0) {
+				printf ("can't do that\n");
+			} else {
+				speed = atoi(s)*1000;
+				printf ("speed is set to: %d\n", speed);
+			}
 		}
 
 		for (int i = 0; i < (1<<16); i++) {
