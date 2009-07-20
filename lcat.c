@@ -12,12 +12,14 @@
        #include <errno.h>
 #include <netinet/in.h>
 #include <netdb.h>
+#include <getopt.h>
+#include <string.h>
 
 int localport = 8002;
 char *gateway = "eniac.seas.upenn.edu";
 int gatewayport = 22;
 int speed = 80000;
-int sleeptime = 100;
+int sleeptime = 20;
 int _servfd;
 
 int client2gw ()
@@ -136,12 +138,37 @@ void cleanup ()
 	exit (0);
 }
 
-int main()
+void parsearg (int argc, char* argv[]) 
 {
-	int servfd = server ();
-	int bufsize = speed/sleeptime;
-	char *buf = (char*) malloc (bufsize);
-	
+	char opt;
+	while ((opt = getopt (argc, argv, "p:h:s:")) != -1) {
+		switch (opt) {
+		case 'p': 
+			localport = atoi(optarg);
+			break;
+		case 'h':
+			gateway = strdup (optarg);
+			break;
+		case 's':
+			sleeptime = atoi (optarg);
+			break;
+		default:
+			printf ("bad option");
+			exit (1);
+		}
+	}
+}
+int main(int argc, char* argv[])
+{
+	int servfd;
+	int bufsize;
+	char *buf;
+
+	parsearg (argc, argv);
+	servfd = server();
+	bufsize = speed/sleeptime;
+	buf = (char*)malloc (bufsize);
+
 	_servfd = servfd;
 	memset (local2gw, 0, sizeof (local2gw));
 	memset (gw2local, 0, sizeof (gw2local));
