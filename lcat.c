@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#define _BSD_SOURCE
        #include <unistd.h>
        #include <sys/time.h>
        #include <sys/types.h>
@@ -12,10 +13,12 @@
 #include <netinet/in.h>
 #include <netdb.h>
 
-int localport = 8001;
+int localport = 8002;
 char *gateway = "eniac.seas.upenn.edu";
 int gatewayport = 22;
 int speed = 80000;
+int sleeptime = 100;
+int _servfd;
 
 int client2gw ()
 {
@@ -47,7 +50,7 @@ int client2gw ()
 
 int server ()
 {
-	int fd = socket (AF_INET, SOCK_STREAM, 0);
+	int fd = socket (AF_INET, SOCK_STREAM, 0), val = 1;
 	struct sockaddr_in addr;
 	
 	if (fd < 0) {
@@ -63,7 +66,11 @@ int server ()
 		perror ("bind");
 		exit(1);
 	}
-	listen (fd, 10);
+
+	/* the following line is copy pasted, recheck and verify */
+	setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
+
+	listen (fd, 1);
 
 	return fd;
 }
@@ -118,16 +125,35 @@ void end_conn (int fd)
 	fprintf (stderr, "A connection was closed\n");
 }
 
-#define BUF_SIZE  4000
+void cleanup ()
+{
+	for (int i = 0; i < (1<<16); i++) {
+		if (local2gw[i]) end_conn (i);
+	}
+
+	shutdown (_servfd, SHUT_RDWR);
+	close (_servfd);
+	exit (0);
+}
+
 int main()
 {
 	int servfd = server ();
-
+	int bufsize = speed/sleeptime;
+	char *buf = (char*) malloc (bufsize);
 	
+	_servfd = servfd;
 	memset (local2gw, 0, sizeof (local2gw));
 	memset (gw2local, 0, sizeof (gw2local));
 
+	signal (SIGINT, cleanup);
+
 	for (;;) {
+		struct timeval t;
+		t.tv_sec = sleeptime/1000;
+		t.tv_usec = (sleeptime % 1000)*1000;
+		select (1, NULL, NULL, NULL, &t); /* basically usleep */
+
 		int nfds = servfd;
 		fd_set rd = build_all (&nfds);
 		fd_set wr;
@@ -152,14 +178,16 @@ int main()
 			} else {
 				speed = atoi(s)*1000;
 				printf ("speed is set to: %d\n", speed);
+				bufsize = speed/sleeptime;
+				free(buf);
+				buf = (char*) malloc (bufsize);
 			}
 		}
 
 		for (int i = 0; i < (1<<16); i++) {
 			if ((local2gw[i] || gw2local[i]) && FD_ISSET (i, &rd)) {
 				int ws = (local2gw[i] ? local2gw[i] : gw2local[i]);
-				char buf [BUF_SIZE];
-				int len = read (i, buf, sizeof(buf));
+				int len = read (i, buf, bufsize);
 				if (len < 1) {
 					end_conn (ws);
 					continue;
