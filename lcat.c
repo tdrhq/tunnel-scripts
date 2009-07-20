@@ -163,7 +163,7 @@ int main(int argc, char* argv[])
 	int servfd;
 	int bufsize;
 	char *buf;
-
+	int bytes = 0;
 	parsearg (argc, argv);
 	servfd = server();
 	bufsize = speed/sleeptime;
@@ -177,8 +177,12 @@ int main(int argc, char* argv[])
 
 	for (;;) {
 		struct timeval t;
-		t.tv_sec = sleeptime/1000;
-		t.tv_usec = (sleeptime % 1000)*1000;
+		int _sleeptime = bytes*1000/speed;
+		
+		_sleeptime = (_sleeptime > sleeptime ? _sleeptime : sleeptime);
+		bytes = 0;
+		t.tv_sec = _sleeptime/1000;
+		t.tv_usec = (_sleeptime % 1000)*1000;
 		select (1, NULL, NULL, NULL, &t); /* basically usleep */
 
 		int nfds = servfd;
@@ -214,16 +218,23 @@ int main(int argc, char* argv[])
 		for (int i = 0; i < (1<<16); i++) {
 			if ((local2gw[i] || gw2local[i]) && FD_ISSET (i, &rd)) {
 				int ws = (local2gw[i] ? local2gw[i] : gw2local[i]);
-				int len = read (i, buf, bufsize);
+				char _buf [100000];
+				int len = read (i, _buf, sizeof(_buf));
+				int len2;
+
 				if (len < 1) {
 					end_conn (ws);
 					continue;
 				}
 
-				len = write (ws, buf, len);
-				if (len < 1) {
+				bytes += len;
+				len2 = write (ws, _buf, len);
+				if (len2 < 1) {
 					end_conn (ws);
 					continue;
+				}
+				if (len2 < len) {
+					fprintf (stderr, "Oh holy shit, I hoped this couldn't happen\n");
 				}
 
 			}
