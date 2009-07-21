@@ -163,6 +163,11 @@ int main(int argc, char* argv[])
 	int bufsize;
 	char *buf;
 	int bytes = 0;
+
+	int bytes_since_clock = 0;
+	time_t last_clock;
+	last_clock = time (NULL);
+
 	parsearg (argc, argv);
 	servfd = server();
 	bufsize = speed/sleeptime;
@@ -177,7 +182,17 @@ int main(int argc, char* argv[])
 	for (;;) {
 		struct timeval t;
 		int _sleeptime = bytes*1000/speed;
-		
+
+		bytes_since_clock += bytes;
+		if (bytes_since_clock > 10*1024*1024) {
+			time_t cur = time(NULL);
+			fprintf (stderr, "Last %d MB in %d seconds at %d kbps\n", bytes_since_clock/1024/1024, 
+				 (int) (cur-last_clock),
+				 (int) ((bytes_since_clock/1024)/(cur-last_clock)));
+			last_clock = cur;
+			bytes_since_clock = 0;
+		}
+
 		_sleeptime = (_sleeptime > sleeptime ? _sleeptime : sleeptime);
 		bytes = 0;
 		t.tv_sec = _sleeptime/1000;
