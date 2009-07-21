@@ -232,7 +232,7 @@ int main(int argc, char* argv[])
 		for (int i = 0; i < (1<<16); i++) {
 			if ((local2gw[i] || gw2local[i]) && FD_ISSET (i, &rd)) {
 				int ws = (local2gw[i] ? local2gw[i] : gw2local[i]);
-				char _buf [100000];
+				char _buf [20000];
 				int len = read (i, _buf, sizeof(_buf));
 				int len2;
 
