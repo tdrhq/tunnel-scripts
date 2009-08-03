@@ -1,7 +1,7 @@
 
 #include <features.h>
-#define __USE_MISC
 #ifndef __USE_MISC
+#define __USE_MISC
 #error woah
 #endif
 #include <stdio.h>

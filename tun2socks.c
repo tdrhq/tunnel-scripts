@@ -29,9 +29,6 @@
 #include "tcpip.h"
 #include <mqueue.h>
 
-mqd_t mq = 1; 
-char mq_name [128];
-
 
 int tun_alloc (char*);
 
@@ -45,56 +42,7 @@ void controller_cleanup ()
 
 	fprintf (stderr, "Pid of cleanup process %d\n", getpid());
 
-	/* kill each child */
-	kill (0, SIGKILL);
-
-	mq_close (mq); 
-	mq_unlink (mq_name);
 	exit(0); 
-}
-
-void message_queue (int fd)
-{
-	/* send packets to the interface */
-
-	char  message [100000] = "<>";
-	struct mq_attr  qattr; 
-	unsigned int priority; 
-	mq_getattr (mq, &qattr); 
-	
-	for (;;){
-		int ret = mq_receive (mq, message, qattr.mq_msgsize, &priority); 
-		if ( ret == -1 ) { 
-			perror ("Could not receive message");
-			return;
-		}
-		write (fd, message, ret);
-	}
-}
-
-void send_syn_ack (FILE *ftun, struct iphdr iphdr, struct tcphdr tcphdr) 
-{
-	int temp = iphdr.daddr;
-	iphdr.daddr = iphdr.saddr;
-	iphdr.saddr = temp;
-
-
-	fwrite (&iphdr, sizeof(iphdr), 1, ftun);
-
-	/* options? */
-	char options[100];
-	memset (options, 0, sizeof(options));
-	fwrite (options, iphdr.ihl - sizeof(iphdr), 1, ftun);
-
-	/* build tcphdr */
-	temp = tcphdr.source;
-	tcphdr.source = tcphdr.dest;
-	tcphdr.dest = temp;
-
-	tcphdr.ack_seq = tcphdr.seq + 1;
-	tcphdr.ack = 1;
-	
-
 }
 
 void read_tun (FILE *ftun)
@@ -148,13 +96,10 @@ int main()
 	int tun = tun_alloc (stun);
 	FILE *ftun = fdopen (tun, "r");
 
-	sprintf (mq_name, "/mqq_%d", getpid());
-	mq = mq_open (mq_name,  O_RDONLY|O_CREAT|O_EXCL, S_IRWXU, NULL);
 	signal (SIGINT, controller_cleanup); 
 
 	if (fork () == 0) {
 		signal (SIGINT, NULL);
-		message_queue (tun);
 	}
 
 	/* let's read these */
