@@ -32,6 +32,46 @@
 
 int tun_alloc (char*);
 
+typedef struct _connection 
+{
+	connection *next;
+	int dest_ip4;
+	int dest_port;
+
+	/**< private >*/
+
+	/* the following two fds together convert the packets into a stream */
+	int raw_send_fd;
+	int tcp_recv_fd;
+	
+	/* the following is the final socket that connects to the destination,
+	   we'll assume a tsocks layer on top if we want to use this for 
+	   SOCKS */
+	int final_fd;
+} connection;
+
+connection *conns;
+
+static connection* find_by_dest (int dest_ip, int dest_port)
+{
+	connection *iter = conns;
+	while (iter) {
+		if (iter->dest_ip4 == dest_ip && iter->dest_port == dest_port)
+			return iter;
+	}
+
+	return NULL;
+}
+
+static connection *create (int dest_ip, int dest_port)
+{
+	assert (!find_by_dest (dest_ip, dest_port));
+	
+	connection *conn = (connection*) malloc (sizeof (connection));
+
+	conn->next = conns;
+	conns = conn;
+}
 
 /**
  * cleanup code. 
@@ -45,7 +85,7 @@ void controller_cleanup ()
 	exit(0); 
 }
 
-void read_tun (FILE *ftun)
+void read_tun (int tun, FILE *ftun)
 {
 	struct iphdr iphdr;
 	struct tcphdr tcphdr;
@@ -98,15 +138,10 @@ int main()
 
 	signal (SIGINT, controller_cleanup); 
 
-	if (fork () == 0) {
-		signal (SIGINT, NULL);
-	}
-
-	/* let's read these */
 	fprintf(stderr, "listening on %s\n", stun);
 
-	while (1) {
-		read_tun (ftun);
-	}
-	fgetc(stdin);
+	io_loop_add_fd (tun, read_tun, (void*) ftun);
+	
+	io_loop_start ();
+
 }
