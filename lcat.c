@@ -80,6 +80,7 @@ void end_conn (int fd)
 {
 	shutdown (fd, SHUT_RDWR);
 	close (fd);
+	io_loop_remove_fd (fd);
 	fprintf (stderr, "A connection was closed\n");
 }
 
