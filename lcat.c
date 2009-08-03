@@ -76,25 +76,68 @@ int server ()
 	return fd;
 }
 
-int local2gw [1<<16];
-int gw2local [1<<16];
-
-
-fd_set build_all (int *nfds) 
+void end_conn (int fd)
 {
-	fd_set d;
-
-	FD_ZERO (&d);
-	for (int i = 0; i < (1<<16); i++) {
-		if (local2gw [i] || gw2local[i]) 
-			FD_SET(i, &d);
-		*nfds = (*nfds < i ? i : *nfds);
-	}
-	return d;
+	shutdown (fd, SHUT_RDWR);
+	close (fd);
+	fprintf (stderr, "A connection was closed\n");
 }
 
+static void pause_if_req (int bytes)
+{
+	static time_t last_clock;
+	static int bytes_since_clock = 0;
+	int _sleeptime = bytes*1000/speed;
+	struct timeval t;
 
-void acceptconn (int servfd)
+	if (!last_clock) last_clock = time (NULL);
+
+	
+	
+	bytes_since_clock += bytes;
+	if (bytes_since_clock > 10*1024*1024) {
+		time_t cur = time(NULL);
+		fprintf (stderr, "Last %d MB in %d seconds at %d kbps\n", bytes_since_clock/1024/1024, 
+			 (int) (cur-last_clock),
+			 (int) ((bytes_since_clock/1024)/(cur-last_clock)));
+		last_clock = cur;
+		bytes_since_clock = 0;
+	}
+	
+	_sleeptime = (_sleeptime > sleeptime ? _sleeptime : sleeptime);
+	t.tv_sec = _sleeptime/1000;
+	t.tv_usec = (_sleeptime % 1000)*1000;
+	select (1, NULL, NULL, NULL, &t); /* basically usleep */
+}
+
+static void rw_tunnel_cb (int i, void* fd_to) 
+{
+	int ws = (int) (fd_to);
+	
+	char _buf [20000];
+	int len = read (i, _buf, sizeof(_buf));
+	int len2;
+	
+	if (len < 1) {
+		end_conn (ws);
+		end_conn (i);
+		return;
+	}
+	
+	len2 = write (ws, _buf, len);
+	if (len2 < 1) {
+		end_conn (ws);
+		end_conn (i);
+		return;
+	}
+	if (len2 < len) {
+		fprintf (stderr, "Oh holy shit, I hoped this couldn't happen\n");
+	}
+
+	pause_if_req (len);
+}
+
+void acceptconn (int servfd, void* userdata)
 {
 	int r = accept (servfd, NULL, NULL);
 	if (r < 0) {
@@ -106,38 +149,34 @@ void acceptconn (int servfd)
 			perror ("connect failed");
 			return;
 		}
-		
-		local2gw [r] = g;
-		gw2local [g] = r;
+
+		io_loop_add_fd (g, rw_tunnel_cb, (void*) r);
+		io_loop_add_fd (r, rw_tunnel_cb, (void*) g);
 		
 		fprintf (stderr, "Conn accepted\n");
 	}
 }
 
-void end_conn (int fd)
+static void kb_command_cb (int fd, void* userdata)
 {
-	int otherend = local2gw[fd]? local2gw[fd] : gw2local[fd];
-	shutdown (fd, SHUT_RDWR);
-	shutdown (otherend, SHUT_RDWR);
-	close (fd);
-	close (otherend);
-	local2gw[fd] = gw2local[fd] = 0;
-	local2gw[otherend] = gw2local[otherend] = 0;
-	fprintf (stderr, "A connection was closed\n");
+	char s [1000];
+	fgets (s, sizeof(s), stdin);
+	if (atoi(s) == 0) {
+		printf ("can't do that\n");
+	} else {
+		speed = atoi(s)*1000;
+		printf ("speed is set to: %d\n", speed);
+	}
 }
 
 void cleanup ()
 {
-	for (int i = 0; i < (1<<16); i++) {
-		if (local2gw[i]) end_conn (i);
-	}
-
 	shutdown (_servfd, SHUT_RDWR);
 	close (_servfd);
 	exit (0);
 }
 
-void parsearg (int argc, char* argv[]) 
+static void parsearg (int argc, char* argv[]) 
 {
 	char opt;
 	while ((opt = getopt (argc, argv, "p:h:s:")) != -1) {
@@ -157,10 +196,11 @@ void parsearg (int argc, char* argv[])
 		}
 	}
 }
+
+
 int main(int argc, char* argv[])
 {
 	int servfd;
-	int bufsize;
 	char *buf;
 	int bytes = 0;
 
@@ -170,88 +210,14 @@ int main(int argc, char* argv[])
 
 	parsearg (argc, argv);
 	servfd = server();
-	bufsize = speed/sleeptime;
-	buf = (char*)malloc (bufsize);
 
 	_servfd = servfd;
-	memset (local2gw, 0, sizeof (local2gw));
-	memset (gw2local, 0, sizeof (gw2local));
 
 	signal (SIGINT, cleanup);
 
-	for (;;) {
-		struct timeval t;
-		int _sleeptime = bytes*1000/speed;
+	io_loop_add_fd (servfd, acceptconn, NULL);
+	io_loop_add_fd (0, kb_command_cb, NULL);
+ 
+	io_loop_start ();
 
-		bytes_since_clock += bytes;
-		if (bytes_since_clock > 10*1024*1024) {
-			time_t cur = time(NULL);
-			fprintf (stderr, "Last %d MB in %d seconds at %d kbps\n", bytes_since_clock/1024/1024, 
-				 (int) (cur-last_clock),
-				 (int) ((bytes_since_clock/1024)/(cur-last_clock)));
-			last_clock = cur;
-			bytes_since_clock = 0;
-		}
-
-		_sleeptime = (_sleeptime > sleeptime ? _sleeptime : sleeptime);
-		bytes = 0;
-		t.tv_sec = _sleeptime/1000;
-		t.tv_usec = (_sleeptime % 1000)*1000;
-		select (1, NULL, NULL, NULL, &t); /* basically usleep */
-
-		int nfds = servfd;
-		fd_set rd = build_all (&nfds);
-		fd_set wr;
-		fd_set er;
-		FD_SET (servfd, &rd);
-		FD_SET (0, &rd);
-
-		FD_ZERO (&wr);
-		FD_ZERO (&er);
-
-		int r = select (nfds + 1, &rd, &wr, &er, NULL);
-
-		if (FD_ISSET (servfd, &rd)) {
-			acceptconn (servfd);
-		}
-
-		if (FD_ISSET (0, &rd)) {
-			char s [1000];
-			fgets (s, sizeof(s), stdin);
-			if (atoi(s) == 0) {
-				printf ("can't do that\n");
-			} else {
-				speed = atoi(s)*1000;
-				printf ("speed is set to: %d\n", speed);
-				bufsize = speed/sleeptime;
-				free(buf);
-				buf = (char*) malloc (bufsize);
-			}
-		}
-
-		for (int i = 0; i < (1<<16); i++) {
-			if ((local2gw[i] || gw2local[i]) && FD_ISSET (i, &rd)) {
-				int ws = (local2gw[i] ? local2gw[i] : gw2local[i]);
-				char _buf [20000];
-				int len = read (i, _buf, sizeof(_buf));
-				int len2;
-
-				if (len < 1) {
-					end_conn (ws);
-					continue;
-				}
-
-				bytes += len;
-				len2 = write (ws, _buf, len);
-				if (len2 < 1) {
-					end_conn (ws);
-					continue;
-				}
-				if (len2 < len) {
-					fprintf (stderr, "Oh holy shit, I hoped this couldn't happen\n");
-				}
-
-			}
-		}
-	}
 }
