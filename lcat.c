@@ -85,10 +85,40 @@ static void rw_tunnel_cb (int i, void* fd_to)
 	pause_if_req (len);
 }
 
+char* parse (const char* buf, const char* query) {
+	char *temp = strdup (buf);
+	char *token = strtok (temp, " \t");
+
+	if (strcmp (token, "tcp") != 0) {
+		fprintf (stderr, "not tcp\n");
+		free (temp);
+		return NULL;
+	}
+
+	while (token = strtok (NULL, " \t")) {
+		char* equal = strchr (token, '=');
+		if (!equal) continue;
+		*equal = ' ';
+	
+		char key[100] = "", val[100] = "";
+		int num = sscanf (token, "%s %s", key, val);
+		if (num < 2) continue;
+
+		if (strcmp (key, query) == 0) {
+			char* ret = strdup (val);
+			free (temp);
+			return ret;
+		}
+	}
+
+	return NULL;
+}
+
 /* connect to the desting that fd was originally bound to */
 static int connect_to_dest (int fd)
 {
 	struct sockaddr_in client;
+	char *dst = NULL, *dport = NULL;
 	int len = sizeof (client);
 	FILE* f;
 	char buf [1000];
@@ -96,10 +126,35 @@ static int connect_to_dest (int fd)
 	assert (0 == getpeername (fd,  (struct sockaddr*) &client, &len));
 	fprintf (stderr, "Connection from port no. %d\n", ntohs (client.sin_port));
 	
+	int port = ntohs (client.sin_port);
+	
 	/* now figure out which was the original destination */
 	f = fopen ("/proc/net/ip_conntrack", "r");
+	while (fgets (buf, sizeof(buf), f)) {
+		char* src = parse (buf, "sport");
+		if (!src) continue;
 
-	return client2server_socket (gateway, gatewayport);
+		if (atoi(src) == port) {
+			/* first dst is all we care for */
+			dst = parse (buf, "dst");
+			dport = parse (buf, "dport");
+			
+			fprintf (stderr, "Got connection to %s:%s\n", dst, dport);
+			free (src);
+			break;
+		}
+
+		free (src);
+	}
+
+	fclose (f);
+	int ret = -1;
+	if (dst && dport) ret = client2server_socket (dst, atoi(dport));
+	
+	free (dst);
+	free (dport);
+
+	return ret;
 }
 
 void acceptconn (int servfd, void* userdata)
@@ -120,7 +175,7 @@ void acceptconn (int servfd, void* userdata)
 			perror ("connect failed");
 			return;
 		}
-
+		printf ("%d %d\n", r, g);
 		io_loop_add_fd (g, rw_tunnel_cb, (void*) r);
 		io_loop_add_fd (r, rw_tunnel_cb, (void*) g);
 		
