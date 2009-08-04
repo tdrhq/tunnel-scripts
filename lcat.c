@@ -20,7 +20,7 @@ int gatewayport = 22;
 int speed = 80000;
 int sleeptime = 20;
 int _servfd;
-
+int enable_iptables = 0;
 
 void end_conn (int fd)
 {
@@ -84,6 +84,16 @@ static void rw_tunnel_cb (int i, void* fd_to)
 	pause_if_req (len);
 }
 
+/* connect to the desting that fd was originally bound to */
+static int connect_to_dest (int fd)
+{
+	struct sockaddr_in client;
+	int len = sizeof (client);
+	getpeername (fd,  (struct sockaddr*) &client, &len);
+	fprintf (stderr, "Connection from port no. %d\n", client.sin_port);
+	return client2server_socket (gateway, gatewayport);
+}
+
 void acceptconn (int servfd, void* userdata)
 {
 	int r = accept (servfd, NULL, NULL);
@@ -91,7 +101,13 @@ void acceptconn (int servfd, void* userdata)
 		perror ("Accept failed");
 		return;
 	} else {
-		int g = client2server_socket (gateway, gatewayport);
+		int g;
+		if (!enable_iptables)
+			g = client2server_socket (gateway, gatewayport);
+		else {
+			g = connect_to_dest (r);
+		}
+			
 		if (g < 0) {
 			perror ("connect failed");
 			return;
@@ -126,7 +142,7 @@ void cleanup ()
 static void parsearg (int argc, char* argv[]) 
 {
 	char opt;
-	while ((opt = getopt (argc, argv, "p:h:s:")) != -1) {
+	while ((opt = getopt (argc, argv, "p:h:s:t")) != -1) {
 		switch (opt) {
 		case 'p': 
 			localport = atoi(optarg);
@@ -136,6 +152,9 @@ static void parsearg (int argc, char* argv[])
 			break;
 		case 's':
 			sleeptime = atoi (optarg);
+			break;
+		case 't':
+			enable_iptables = 1;
 			break;
 		default:
 			printf ("bad option");
