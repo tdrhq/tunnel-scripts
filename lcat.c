@@ -13,6 +13,7 @@
 #include <netdb.h>
 #include <getopt.h>
 #include <string.h>
+#include <assert.h>
 
 int localport = 8002;
 char *gateway = "eniac.seas.upenn.edu";
@@ -89,8 +90,15 @@ static int connect_to_dest (int fd)
 {
 	struct sockaddr_in client;
 	int len = sizeof (client);
-	getpeername (fd,  (struct sockaddr*) &client, &len);
-	fprintf (stderr, "Connection from port no. %d\n", client.sin_port);
+	FILE* f;
+	char buf [1000];
+
+	assert (0 == getpeername (fd,  (struct sockaddr*) &client, &len));
+	fprintf (stderr, "Connection from port no. %d\n", ntohs (client.sin_port));
+	
+	/* now figure out which was the original destination */
+	f = fopen ("/proc/net/ip_conntrack", "r");
+
 	return client2server_socket (gateway, gatewayport);
 }
 
