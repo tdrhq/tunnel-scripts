@@ -175,7 +175,6 @@ void acceptconn (int servfd, void* userdata)
 			perror ("connect failed");
 			return;
 		}
-		printf ("%d %d\n", r, g);
 		io_loop_add_fd (g, rw_tunnel_cb, (void*) r);
 		io_loop_add_fd (r, rw_tunnel_cb, (void*) g);
 		
