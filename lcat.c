@@ -151,6 +151,7 @@ static void kb_command_cb (int fd, void* userdata)
 	char s [1000];
 	fgets (s, sizeof(s), stdin);
 	if (atoi(s) == 0) {
+		speed = 0;
 		printf ("Speed is set to: unlimited\n");
 	} else {
 		speed = atoi(s)*1000;
