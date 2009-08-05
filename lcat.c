@@ -40,10 +40,10 @@
 int localport = 8002;
 char *gateway = NULL;
 int gatewayport = 22;
-int speed = 80000;
+int speed = 0;
 int sleeptime = 20;
 int _servfd;
-int enable_iptables = 0;
+int enable_iptables = 1; /* otherwise we're just running in a single gateway mode */
 
 void end_conn (int fd)
 {
@@ -57,12 +57,11 @@ static void pause_if_req (int bytes)
 {
 	static time_t last_clock;
 	static int bytes_since_clock = 0;
-	int _sleeptime = bytes*1000/speed;
+	int _sleeptime = speed ? bytes*1000/speed : 0;
 	struct timeval t;
 
+	if (speed == 0) return;
 	if (!last_clock) last_clock = time (NULL);
-
-	
 	
 	bytes_since_clock += bytes;
 	if (bytes_since_clock > 10*1024*1024) {
@@ -83,7 +82,6 @@ static void pause_if_req (int bytes)
 static void rw_tunnel_cb (int i, void* fd_to) 
 {
 	int ws = (int) (fd_to);
-	
 	char _buf [20000];
 	int len = read (i, _buf, sizeof(_buf));
 	int len2;
@@ -122,26 +120,23 @@ connect_to_dest (int fd)
 void 
 acceptconn (int servfd, void* userdata)
 {
-	int r = accept (servfd, NULL, NULL);
+	int r = accept (servfd, NULL, NULL), g;
 	if (r < 0) {
 		perror ("Accept failed");
 		return;
 	} else {
-		int g;
 		if (!enable_iptables)
 			g = client2server_socket (gateway, gatewayport);
-		else {
+		else 
 			g = connect_to_dest (r);
-		}
 			
 		if (g < 0) {
 			perror ("connect failed");
+			close (r);
 			return;
 		}
 		io_loop_add_fd (g, rw_tunnel_cb, (void*) r);
 		io_loop_add_fd (r, rw_tunnel_cb, (void*) g);
-		
-		fprintf (stderr, "Conn accepted\n");
 	}
 }
 
@@ -150,10 +145,10 @@ static void kb_command_cb (int fd, void* userdata)
 	char s [1000];
 	fgets (s, sizeof(s), stdin);
 	if (atoi(s) == 0) {
-		printf ("can't do that\n");
+		printf ("Speed is set to: unlimited\n");
 	} else {
 		speed = atoi(s)*1000;
-		printf ("speed is set to: %d\n", speed);
+		printf ("Speed is set to: %d\n", speed);
 	}
 }
 
