@@ -186,8 +186,8 @@ static void parsearg (int argc, char* argv[])
 			speed = atoi (optarg);
 			break;
 		case 'g':
-			gateway = strdup (strtok (optarg, ':'));
-			gatewayport = atoi (strtok (NULL, ':'));
+			gateway = strdup (strtok (optarg, ":"));
+			gatewayport = atoi (strtok (NULL, ":"));
 			enable_iptables = 0;
 			break;
 		case 't':
