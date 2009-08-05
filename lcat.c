@@ -37,6 +37,13 @@
 #include <limits.h>
 #include <linux/netfilter_ipv4.h>
 
+/* storing an integer in a pointer. Apparently though, the following
+ * is not entirely portable. e.g., Glib generates similar functions
+ * depending on the system type. Depending on your system you might
+ * want to remove the (long) from here. */
+#define LCAT_POINTER_TO_INT(p) ((int) (long) p)
+#define LCAT_INT_TO_POINTER(i) ((void*) (long) i)
+
 int localport = 8002;
 char *gateway = NULL;
 int gatewayport = 22;
@@ -81,7 +88,7 @@ static void pause_if_req (int bytes)
 
 static void rw_tunnel_cb (int i, void* fd_to) 
 {
-	int ws = (int) (fd_to);
+	int ws = LCAT_POINTER_TO_INT (fd_to);
 	char _buf [20000];
 	int len = read (i, _buf, sizeof(_buf));
 	int len2;
@@ -135,8 +142,8 @@ acceptconn (int servfd, void* userdata)
 			close (r);
 			return;
 		}
-		io_loop_add_fd (g, rw_tunnel_cb, (void*) r);
-		io_loop_add_fd (r, rw_tunnel_cb, (void*) g);
+		io_loop_add_fd (g, rw_tunnel_cb, LCAT_INT_TO_POINTER (r));
+		io_loop_add_fd (r, rw_tunnel_cb, LCAT_INT_TO_POINTER (g));
 	}
 }
 
