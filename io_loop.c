@@ -39,18 +39,17 @@
 
 static io_callback allfds [1<<16];
 static void* userdata[1<<16];
+static int nfds = 0;
 
-
-static fd_set build_all (int *nfds) 
+static fd_set build_all () 
 {
 	fd_set d;
 	int i;
 
 	FD_ZERO (&d);
-	for (i = 0; i < (1<<16); i++) {
+	for (i = 0; i < nfds; i++) {
 		if (allfds [i]) 
 			FD_SET(i, &d);
-		*nfds = (*nfds < i ? i : *nfds);
 	}
 	return d;
 }
@@ -60,6 +59,8 @@ void io_loop_add_fd (int fd, io_callback cb, void* _userdata)
 	assert (!allfds [fd]);
 	allfds[fd] = cb;
 	userdata[fd] = _userdata;
+
+	if (fd > nfds) nfds = fd;
 }
 
 void io_loop_remove_fd (int fd)
@@ -67,13 +68,19 @@ void io_loop_remove_fd (int fd)
 	assert (allfds [fd]);
 	allfds [fd] = NULL;
 	userdata[fd] = NULL;
+
+	if (fd == nfds) {
+		int i;
+		nfds = 0;
+		for (i = nfds - 1; i > 0 && !allfds[i]; i--); 
+		nfds = i;
+	}
 }
 
 void io_loop_start ()
 {
 	for (;;) {
-		int nfds = 0;
-		fd_set rd = build_all (&nfds);
+		fd_set rd = build_all ();
 		fd_set wr;
 		fd_set er;
 		int i;
@@ -83,7 +90,7 @@ void io_loop_start ()
 
 		select (nfds + 1, &rd, &wr, &er, NULL);
 
-		for (i = 0; i < (1<<16); i++) {
+		for (i = 0; i < nfds; i++) {
 			if (allfds [i] && FD_ISSET (i, &rd)) {
 				(allfds [i]) (i, userdata[i]);
 			}
