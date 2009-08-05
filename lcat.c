@@ -161,7 +161,8 @@ void cleanup ()
 
 static void print_help ()
 {
-	printf ("lcat is a tunnelling tool useful for transparently\n"
+	fprintf (stderr,
+		"lcat is a tunnelling tool useful for transparently\n"
 		"tunnelling TCP connections over a SOCKS proxy, like ssh -D\n"
 		"\n"
 		"Usage: lcat [-p port] [-t] [-d] [-h] [-s sleeptime]\n"
@@ -169,10 +170,11 @@ static void print_help ()
 		"You can use lcat to throttle the amount of bandwidth you\n"
 		"use.\n");
 }
+
 static void parsearg (int argc, char* argv[]) 
 {
 	char opt;
-	while ((opt = getopt (argc, argv, "p:h:s:t")) != -1) {
+	while ((opt = getopt (argc, argv, "p:h:s:tg:")) != -1) {
 		switch (opt) {
 		case 'p': 
 			localport = atoi(optarg);
@@ -181,7 +183,12 @@ static void parsearg (int argc, char* argv[])
 			print_help ();
 			break;
 		case 's':
-			sleeptime = atoi (optarg);
+			speed = atoi (optarg);
+			break;
+		case 'g':
+			gateway = strdup (strtok (optarg, ':'));
+			gatewayport = atoi (strtok (NULL, ':'));
+			enable_iptables = 0;
 			break;
 		case 't':
 			enable_iptables = 1;
@@ -194,27 +201,15 @@ static void parsearg (int argc, char* argv[])
 	}
 }
 
-
 int main(int argc, char* argv[])
 {
-	int servfd;
-	char *buf;
-	int bytes = 0;
-
-	int bytes_since_clock = 0;
-	time_t last_clock;
-	last_clock = time (NULL);
-
 	parsearg (argc, argv);
-	servfd = server_socket (localport);
-
-	_servfd = servfd;
+	_servfd = server_socket (localport);
 
 	signal (SIGINT, cleanup);
 
-	io_loop_add_fd (servfd, acceptconn, NULL);
+	io_loop_add_fd (_servfd, acceptconn, NULL);
 	io_loop_add_fd (0, kb_command_cb, NULL);
- 
 	io_loop_start ();
-
+	return 0;
 }
