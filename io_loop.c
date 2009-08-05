@@ -47,7 +47,7 @@ static fd_set build_all ()
 	int i;
 
 	FD_ZERO (&d);
-	for (i = 0; i < nfds; i++) {
+	for (i = 0; i <= nfds; i++) {
 		if (allfds [i]) 
 			FD_SET(i, &d);
 	}
@@ -71,8 +71,8 @@ void io_loop_remove_fd (int fd)
 
 	if (fd == nfds) {
 		int i;
-		nfds = 0;
-		for (i = nfds - 1; i > 0 && !allfds[i]; i--); 
+		nfds = 1;
+		for (i = nfds - 1; i > 0 && allfds[i] == NULL; i--); 
 		nfds = i;
 	}
 }
@@ -90,7 +90,7 @@ void io_loop_start ()
 
 		select (nfds + 1, &rd, &wr, &er, NULL);
 
-		for (i = 0; i < nfds; i++) {
+		for (i = 0; i <= nfds; i++) {
 			if (allfds [i] && FD_ISSET (i, &rd)) {
 				(allfds [i]) (i, userdata[i]);
 			}
