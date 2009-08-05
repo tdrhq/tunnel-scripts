@@ -18,6 +18,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -37,12 +38,8 @@
 #include <limits.h>
 #include <linux/netfilter_ipv4.h>
 
-/* storing an integer in a pointer. Apparently though, the following
- * is not entirely portable. e.g., Glib generates similar functions
- * depending on the system type. Depending on your system you might
- * want to remove the (long) from here. */
-#define LCAT_POINTER_TO_INT(p) ((int) (long) p)
-#define LCAT_INT_TO_POINTER(i) ((void*) (long) i)
+#define LCAT_POINTER_TO_INT(p) ((int) (intptr_t) (p))
+#define LCAT_INT_TO_POINTER(i) ((void*) (intptr_t) (i))
 
 int localport = 8002;
 char *gateway = NULL;
