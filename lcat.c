@@ -195,6 +195,16 @@ void cleanup ()
 	exit (0);
 }
 
+static void print_help ()
+{
+	printf ("lcat is a tunnelling tool useful for transparently\n"
+		"tunnelling TCP connections over a SOCKS proxy, like ssh -D\n"
+		"\n"
+		"Usage: lcat [-p port] [-t] [-d] [-h] [-s sleeptime]\n"
+		"\n"
+		"You can use lcat to throttle the amount of bandwidth you\n"
+		"use.\n");
+}
 static void parsearg (int argc, char* argv[]) 
 {
 	char opt;
@@ -204,7 +214,7 @@ static void parsearg (int argc, char* argv[])
 			localport = atoi(optarg);
 			break;
 		case 'h':
-			gateway = strdup (optarg);
+			print_help ();
 			break;
 		case 's':
 			sleeptime = atoi (optarg);
@@ -213,7 +223,8 @@ static void parsearg (int argc, char* argv[])
 			enable_iptables = 1;
 			break;
 		default:
-			printf ("bad option");
+			printf ("Bad option\n");
+			print_help ();
 			exit (1);
 		}
 	}
