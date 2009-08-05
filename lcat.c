@@ -34,6 +34,8 @@
 #include <getopt.h>
 #include <string.h>
 #include <assert.h>
+#include <limits.h>
+#include <linux/netfilter_ipv4.h>
 
 int localport = 8002;
 char *gateway = "eniac.seas.upenn.edu";
@@ -134,49 +136,22 @@ char* parse (const char* buf, const char* query) {
 }
 
 /* connect to the desting that fd was originally bound to */
-static int connect_to_dest (int fd)
+static int 
+connect_to_dest (int fd)
 {
 	struct sockaddr_in client;
-	char *dst = NULL, *dport = NULL;
 	int len = sizeof (client);
-	FILE* f;
-	char buf [1000];
 
-	assert (0 == getpeername (fd,  (struct sockaddr*) &client, &len));
-	fprintf (stderr, "Connection from port no. %d\n", ntohs (client.sin_port));
-	
-	int port = ntohs (client.sin_port);
-	
-	/* now figure out which was the original destination */
-	f = fopen ("/proc/net/ip_conntrack", "r");
-	while (fgets (buf, sizeof(buf), f)) {
-		char* src = parse (buf, "sport");
-		if (!src) continue;
-
-		if (atoi(src) == port) {
-			/* first dst is all we care for */
-			dst = parse (buf, "dst");
-			dport = parse (buf, "dport");
-			
-			fprintf (stderr, "Got connection to %s:%s\n", dst, dport);
-			free (src);
-			break;
-		}
-
-		free (src);
+	getsockopt (fd, SOL_IP, SO_ORIGINAL_DST, (struct sockaddr*) &client, &len);
+	int ret = socket (AF_INET, SOCK_STREAM, 0);
+	if (connect (ret, (struct sockaddr*) &client, sizeof (client)) == 0) {
+		return ret;
 	}
-
-	fclose (f);
-	int ret = -1;
-	if (dst && dport) ret = client2server_socket (dst, atoi(dport));
-	
-	free (dst);
-	free (dport);
-
-	return ret;
+	else return -1;
 }
 
-void acceptconn (int servfd, void* userdata)
+void 
+acceptconn (int servfd, void* userdata)
 {
 	int r = accept (servfd, NULL, NULL);
 	if (r < 0) {
