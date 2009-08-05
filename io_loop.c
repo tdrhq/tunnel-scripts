@@ -62,7 +62,9 @@ void io_loop_add_fd (int fd, io_callback cb, void* _userdata)
 
 	if (fd > nfds) nfds = fd;
 
+#ifdef IO_LOOP_DEBUG
 	printf ("added %d %d\n", fd, nfds);
+#endif
 }
 
 void io_loop_remove_fd (int fd)
@@ -78,7 +80,9 @@ void io_loop_remove_fd (int fd)
 		if (nfds < 0) nfds = 0;
 	}
 
+#ifdef IO_LOOP_DEBUG
 	printf ("removed %d %d\n", fd, nfds);
+#endif
 }
 
 void io_loop_start ()
