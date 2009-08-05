@@ -16,8 +16,11 @@ int client2server_socket (const char* gateway, int port)
 	struct hostent *server;
 	struct sockaddr_in servaddr;
 
-	if (clientfd < 0)
+	if (clientfd < 0) {
 		perror ("Client Socket");
+		return clientfd;
+	}
+
 
 	server = gethostbyname (gateway);
 	if (server == NULL) 
@@ -31,7 +34,7 @@ int client2server_socket (const char* gateway, int port)
 
 	if (connect (clientfd, (struct sockaddr*)&servaddr, sizeof(servaddr)) < 0) {
 		perror ("Client connect");
-		exit (0);
+		return -1;
 	}
 
 	return clientfd;
