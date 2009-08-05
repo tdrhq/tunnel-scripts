@@ -38,7 +38,7 @@
 #include <linux/netfilter_ipv4.h>
 
 int localport = 8002;
-char *gateway = "eniac.seas.upenn.edu";
+char *gateway = NULL;
 int gatewayport = 22;
 int speed = 80000;
 int sleeptime = 20;
@@ -100,39 +100,8 @@ static void rw_tunnel_cb (int i, void* fd_to)
 		end_conn (i);
 		return;
 	}
-	if (len2 < len) {
-		fprintf (stderr, "Oh holy shit, I hoped this couldn't happen\n");
-	}
-
+	assert (len2 == len);
 	pause_if_req (len);
-}
-
-char* parse (const char* buf, const char* query) {
-	char *temp = strdup (buf);
-	char *token = strtok (temp, " \t");
-
-	if (strcmp (token, "tcp") != 0) {
-		free (temp);
-		return NULL;
-	}
-
-	while (token = strtok (NULL, " \t")) {
-		char* equal = strchr (token, '=');
-		if (!equal) continue;
-		*equal = ' ';
-	
-		char key[100] = "", val[100] = "";
-		int num = sscanf (token, "%s %s", key, val);
-		if (num < 2) continue;
-
-		if (strcmp (key, query) == 0) {
-			char* ret = strdup (val);
-			free (temp);
-			return ret;
-		}
-	}
-
-	return NULL;
 }
 
 /* connect to the desting that fd was originally bound to */
