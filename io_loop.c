@@ -61,6 +61,8 @@ void io_loop_add_fd (int fd, io_callback cb, void* _userdata)
 	userdata[fd] = _userdata;
 
 	if (fd > nfds) nfds = fd;
+
+	printf ("added %d %d\n", fd, nfds);
 }
 
 void io_loop_remove_fd (int fd)
@@ -71,10 +73,12 @@ void io_loop_remove_fd (int fd)
 
 	if (fd == nfds) {
 		int i;
-		nfds = 1;
-		for (i = nfds - 1; i > 0 && allfds[i] == NULL; i--); 
+		for (i = nfds - 1; i > 0 && allfds[i] == NULL; i--);
 		nfds = i;
+		if (nfds < 0) nfds = 0;
 	}
+
+	printf ("removed %d %d\n", fd, nfds);
 }
 
 void io_loop_start ()
