@@ -74,13 +74,14 @@ int server_socket (int localport)
 	addr.sin_addr.s_addr = INADDR_ANY;
 	addr.sin_port = htons(localport);
 
+	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val)) == -1)
+		perror ("Unable to set SO_REUSEADDR for bind");
+
 	if (bind (fd, (struct sockaddr*) &addr, sizeof(addr)) < 0) {
 		perror ("bind");
 		exit(1);
 	}
 
-	/* the following line is copy pasted, recheck and verify */
-	setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
 
 	listen (fd, 1);
 
