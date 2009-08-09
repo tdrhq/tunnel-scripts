@@ -20,9 +20,12 @@
 
 
 typedef void (*io_callback) (int fd, void* userdata);
+typedef void (*io_timeout) ();
 
 void io_loop_add_fd (int fd, io_callback cb, void* _userdata);
 
 void io_loop_remove_fd (int fd);
+
+void io_loop_set_timeout (int seconds, io_timeout cb);
 
 void io_loop_start () __attribute__ ((noreturn));

@@ -40,6 +40,24 @@
 static io_callback allfds [1<<16];
 static void* userdata[1<<16];
 static int nfds = 0;
+struct timeval *timeout = NULL;
+static io_timeout timeout_cb;
+
+void io_loop_set_timeout (int seconds, io_timeout cb)
+{
+	if (timeout) free (timeout);
+	if (seconds == 0) {
+		timeout = NULL;
+		return;
+	}
+
+	timeout = (struct timeval*) malloc (sizeof (timeout));
+
+	timeout->tv_sec = seconds;
+	timeout->tv_usec = 0;
+
+	timeout_cb = cb;
+}
 
 static fd_set build_all () 
 {
@@ -96,12 +114,14 @@ void io_loop_start ()
 		FD_ZERO (&wr);
 		FD_ZERO (&er);
 
-		select (nfds + 1, &rd, &wr, &er, NULL);
+		select (nfds + 1, &rd, &wr, &er, timeout);
 
 		for (i = 0; i <= nfds; i++) {
 			if (allfds [i] && FD_ISSET (i, &rd)) {
 				(allfds [i]) (i, userdata[i]);
 			}
 		}
+		
+		timeout_cb ();
 	}
 }
