@@ -43,8 +43,11 @@ int client2server_socket (const char* gateway, int port)
 
 
 	server = gethostbyname (gateway);
-	if (server == NULL) 
-		exit (1);
+	if (server == NULL) {
+		perror ("Server not found %s\n", gateway); 
+		close (clientfd);
+		return -1;
+	}
 
 	memset (&servaddr, 0, sizeof(servaddr));
 	servaddr.sin_family = AF_INET;
@@ -54,6 +57,7 @@ int client2server_socket (const char* gateway, int port)
 
 	if (connect (clientfd, (struct sockaddr*)&servaddr, sizeof(servaddr)) < 0) {
 		perror ("Client connect");
+		close (clientfd);
 		return -1;
 	}
 
