@@ -40,22 +40,11 @@
 static io_callback allfds [1<<16];
 static void* userdata[1<<16];
 static int nfds = 0;
-struct timeval *timeout = NULL;
 static io_timeout timeout_cb;
-
+static int timeout_seconds = 0;
 void io_loop_set_timeout (int seconds, io_timeout cb)
 {
-	if (timeout) free (timeout);
-	if (seconds == 0) {
-		timeout = NULL;
-		return;
-	}
-
-	timeout = (struct timeval*) malloc (sizeof (timeout));
-
-	timeout->tv_sec = seconds;
-	timeout->tv_usec = 0;
-
+	timeout_seconds = seconds;
 	timeout_cb = cb;
 }
 
@@ -110,10 +99,17 @@ void io_loop_start ()
 		fd_set wr;
 		fd_set er;
 		int i;
+		struct timeval* timeout = NULL;
 
 		FD_ZERO (&wr);
 		FD_ZERO (&er);
 
+		if (timeout_seconds) {
+			timeout = (struct timeval*) malloc (sizeof (struct timeval));
+			timeout->tv_sec = timeout_seconds;
+			timeout->tv_usec = 0;
+		}
+		
 		select (nfds + 1, &rd, &wr, &er, timeout);
 
 		for (i = 0; i <= nfds; i++) {
@@ -122,6 +118,9 @@ void io_loop_start ()
 			}
 		}
 		
-		timeout_cb ();
+		if (timeout) {
+			timeout_cb ();
+			free (timeout);
+		}
 	}
 }
