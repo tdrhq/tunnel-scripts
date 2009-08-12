@@ -55,6 +55,9 @@ int bufsize = 0;
 
 void end_conn (int fd)
 {
+#ifdef IO_LOOP_DEBUG
+	printf ("closing fd: %d\n", fd);
+#endif
 	shutdown (fd, SHUT_RDWR);
 	close (fd);
 	io_loop_remove_fd (fd);
@@ -121,8 +124,21 @@ static void got_connected (int fd, void *data)
 {
 	int source = LCAT_POINTER_TO_INT (data);
 
+	int so_error, so_error_len = sizeof (int);
+
+	getsockopt (fd, SOL_SOCKET, SO_ERROR, &so_error, &so_error_len);
+
+	if (so_error != 0) {
+#ifdef IO_LOOP_DEBUG
+		printf ("A connect failed (%d)\n", fd);
+#endif
+		end_conn (fd);
+	}
+
 	int ret = socket (AF_INET, SOCK_STREAM, 0);
 	int flags = fcntl (ret, F_GETFL, 0);
+
+
 	assert (flags != -1);
 	fcntl (ret, F_SETFL, flags & (!O_NONBLOCK));
 	
@@ -150,8 +166,15 @@ connect_to_dest (int fd)
 
 	if (connect (ret, (struct sockaddr*) &client, sizeof (client)) == 0) {
 		return ret;
+	} 
+	
+	if (errno != EINPROGRESS) {
+		perror ("early case of connect failing");
+		end_conn (ret);
+		end_conn (fd);
+		return -1;
 	}
-	else return -1;
+	return ret;
 }
 
 void 
