@@ -109,6 +109,12 @@ static void rw_tunnel_cb (int i, void* fd_to)
 	pause_if_req (len);
 }
 
+static void got_connection_er (int fd, void* data)
+{
+	end_conn (fd);
+	end_conn (LCAT_POINTER_TO_INT (data));
+}
+
 /* connect to the desting that fd was originally bound to */
 
 static void got_connected (int fd, void *data)
@@ -122,14 +128,9 @@ static void got_connected (int fd, void *data)
 	
 	io_loop_remove_fd (fd);
 	io_loop_add_fd_read (fd, rw_tunnel_cb, LCAT_INT_TO_POINTER (source));
+	io_loop_add_fd_er (fd, got_connection_er, LCAT_INT_TO_POINTER (source));
 	io_loop_add_fd_read (source, rw_tunnel_cb, LCAT_INT_TO_POINTER (fd));
-}
-
-static void got_connection_er (int fd, void* data)
-{
-	io_loop_remove_fd (fd);
-	close (fd);
-	close (LCAT_POINTER_TO_INT (data));
+	io_loop_add_fd_er (source, got_connection_er, LCAT_INT_TO_POINTER (fd));
 }
 
 static int
