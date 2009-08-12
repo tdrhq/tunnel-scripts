@@ -37,88 +37,90 @@
 #include "io_loop.h"
 
 static struct async_fd {
-	io_callback read_cb;
-	io_callback write_cb;
-
-	void* read_userdata;
-	void* write_userdata;
-
+	io_callback cb [3];
+	void* userdata [3];
 } allfds [1<<16];
 
 static int nfds = 0;
 static io_timeout timeout_cb;
 static int timeout_seconds = 0;
+
 void io_loop_set_timeout (int seconds, io_timeout cb)
 {
 	timeout_seconds = seconds;
 	timeout_cb = cb;
 }
 
-static fd_set build_all_read () 
+static fd_set build_all (int _num)
 {
 	fd_set d;
 	int i;
 
 	FD_ZERO (&d);
 	for (i = 0; i <= nfds; i++) {
-		if (allfds [i].read_cb) 
+		if (allfds [i].cb[_num]) 
 			FD_SET(i, &d);
 	}
 	return d;
 }
 
+static fd_set build_all_read () 
+{
+	return build_all (0);
+}
+
 static fd_set build_all_write ()
 {
-	fd_set d;
+	return build_all (1);
+}
+
+static fd_set build_all_er ()
+{
+	return build_all (2);
+}
+
+static void reduce_nfds ()
+{
 	int i;
-	FD_ZERO (&d);
-	for (i = 0; i <= nfds; i++) {
-		if (allfds[i].write_cb)
-			FD_SET (i, &d);
-	}
-	return d;
+	for (i = nfds; i > 0 && allfds[i].cb [0] == NULL && allfds[i].cb [1] == NULL && allfds[i].cb[2] == NULL; i--);
+	nfds = i;
+	if (nfds < 0) nfds = 0;
 }
 
-void io_loop_add_fd (int fd, io_callback cb, void* _userdata) 
+static void io_loop_add_fd (int _num, int fd, io_callback cb, void* _userdata) 
 {
-	assert (!allfds[fd].read_cb);
-	allfds[fd].read_cb = cb;
-	allfds[fd].read_userdata = _userdata;
+	assert (!allfds[fd].cb [_num]);
+	allfds[fd].cb [_num] = cb;
+	allfds[fd].userdata [_num]= _userdata;
 
 	if (fd > nfds) nfds = fd;
 
 #ifdef IO_LOOP_DEBUG
-	printf ("added %d %d\n", fd, nfds);
+	printf ("added %d %d %d\n", _num, fd, nfds);
 #endif
 }
 
-void io_loop_add_fd_write (int fd, io_callback cb, void* _userdata)
+void io_loop_add_fd_read (int fd, io_callback cb, void* data)
 {
-	assert (!allfds[fd].write_cb);
-	allfds[fd].write_cb = cb;
-	allfds[fd].write_userdata = _userdata;
-	
-	if (fd > nfds) nfds = fd;
-	
-#ifdef IO_LOOP_DEBUG
-	printf ("added a write %d %d\n", fd, nfds);
-#endif
+	return io_loop_add_fd (0, fd, cb, data);
+}
+void io_loop_add_fd_write (int fd, io_callback cb, void* data)
+{
+	return io_loop_add_fd (1, fd, cb, data);
+}
+void io_loop_add_fd_er (int fd, io_callback cb, void* data)
+{
+	return io_loop_add_fd (2, fd, cb, data);
 }
 
 /* removes all write and read callbacks associated with this. */
-void io_loop_remove_fd (int fd)
+void io_loop_remove_fd_n (int fd, int _num)
 {
-	assert (allfds [fd].read_cb);
-	allfds [fd].read_cb = NULL;
-	allfds [fd].read_userdata = NULL;
-	allfds [fd].write_cb = NULL;
-	allfds [fd].write_userdata = NULL;
+	allfds [fd].cb [_num] = NULL;
+	allfds [fd].userdata [_num]= NULL;
 
 	if (fd == nfds) {
-		int i;
-		for (i = nfds - 1; i > 0 && allfds[i].read_cb == NULL && allfds[i].write_cb == NULL; i--);
-		nfds = i;
-		if (nfds < 0) nfds = 0;
+		reduce_nfds ();
 	}
 
 #ifdef IO_LOOP_DEBUG
@@ -126,18 +128,23 @@ void io_loop_remove_fd (int fd)
 #endif
 }
 
+void io_loop_remove_fd (int fd)
+{
+	int i;
+	for (i = 0; i < 3; i++) io_loop_remove_fd_n (fd, i);
+}
+
 void io_loop_start ()
 {
 	for (;;) {
-		fd_set rd = build_all_read ();
-		fd_set wr = build_all_write ();
-		fd_set er;
-		int i;
+		fd_set d [3];
+		int i, n;
 		int num_ready;
 		struct timeval* timeout = NULL;
 
-		FD_ZERO (&wr);
-		FD_ZERO (&er);
+		d [0]  = build_all_read ();
+		d [1]  = build_all_write ();
+		d [2]  = build_all_er ();
 
 		if (timeout_seconds) {
 			timeout = (struct timeval*) malloc (sizeof (struct timeval));
@@ -145,19 +152,16 @@ void io_loop_start ()
 			timeout->tv_usec = 0;
 		}
 		
-		num_ready = select (nfds + 1, &rd, &wr, &er, timeout);
+		num_ready = select (nfds + 1, &d[0], &d[1], &d[2], timeout);
 
-		/* what makes more sense? to call a read first, or a write? */
-		for (i = 0; i <= nfds; i++) {
-			if (allfds [i].read_cb && FD_ISSET (i, &rd)) {
-				(allfds [i].read_cb) (i, allfds[i].read_userdata);
+		/* what order makes more sense? to call a read first, or a write? */
+
+		for (n = 0; n < 3; n++) 
+			for (i = 0; i <= nfds; i++) {
+				if (allfds [i].cb [n] && FD_ISSET (i, &d[n])) {
+					(allfds [i].cb [n]) (i, allfds[i].userdata[n]);
+				}
 			}
-		}
-		
-		for (i = 0; i <= nfds; i++) {
-			if (allfds [i].write_cb && FD_ISSET (i, &wr))
-				(allfds[i].write_cb) (i, allfds[i].write_userdata);
-		}
 		
 		if (timeout && !num_ready) {
 			timeout_cb ();

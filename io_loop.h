@@ -22,7 +22,7 @@
 typedef void (*io_callback) (int fd, void* userdata);
 typedef void (*io_timeout) ();
 
-void io_loop_add_fd (int fd, io_callback cb, void* _userdata);
+void io_loop_add_fd_read (int fd, io_callback cb, void* _userdata);
 
 void io_loop_add_fd_write (int fd, io_callback cb, void* _userdata);
 

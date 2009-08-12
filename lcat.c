@@ -138,8 +138,8 @@ acceptconn (int servfd, void* userdata)
 			close (r);
 			return;
 		}
-		io_loop_add_fd (g, rw_tunnel_cb, LCAT_INT_TO_POINTER (r));
-		io_loop_add_fd (r, rw_tunnel_cb, LCAT_INT_TO_POINTER (g));
+		io_loop_add_fd_read (g, rw_tunnel_cb, LCAT_INT_TO_POINTER (r));
+		io_loop_add_fd_read (r, rw_tunnel_cb, LCAT_INT_TO_POINTER (g));
 	}
 }
 
@@ -222,8 +222,8 @@ int main(int argc, char* argv[])
 
 	signal (SIGINT, cleanup);
 
-	io_loop_add_fd (_servfd, acceptconn, NULL);
-	io_loop_add_fd (0, kb_command_cb, NULL);
+	io_loop_add_fd_read (_servfd, acceptconn, NULL);
+	io_loop_add_fd_read (0, kb_command_cb, NULL);
 	io_loop_set_timeout (60, timeout_cb);
 	io_loop_start ();
 	return 0;
