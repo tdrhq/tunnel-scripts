@@ -130,7 +130,7 @@ void io_loop_start ()
 {
 	for (;;) {
 		fd_set rd = build_all_read ();
-		fd_set wr;
+		fd_set wr = build_all_write ();
 		fd_set er;
 		int i;
 		int num_ready;
@@ -147,10 +147,16 @@ void io_loop_start ()
 		
 		num_ready = select (nfds + 1, &rd, &wr, &er, timeout);
 
+		/* what makes more sense? to call a read first, or a write? */
 		for (i = 0; i <= nfds; i++) {
 			if (allfds [i].read_cb && FD_ISSET (i, &rd)) {
 				(allfds [i].read_cb) (i, allfds[i].read_userdata);
 			}
+		}
+		
+		for (i = 0; i <= nfds; i++) {
+			if (allfds [i].write_cb && FD_ISSET (i, &wr))
+				(allfds[i].write_cb) (i, allfds[i].write_userdata);
 		}
 		
 		if (timeout && !num_ready) {
