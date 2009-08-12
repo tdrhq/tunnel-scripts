@@ -92,6 +92,19 @@ void io_loop_add_fd (int fd, io_callback cb, void* _userdata)
 #endif
 }
 
+void io_loop_add_fd_write (int fd, io_callback cb, void* _userdata)
+{
+	assert (!allfds[fd].write_cb);
+	allfds[fd].write_cb = cb;
+	allfds[fd].write_userdata = _userdata;
+	
+	if (fd > nfds) nfds = fd;
+	
+#ifdef IO_LOOP_DEBUG
+	printf ("added a write %d %d\n", fd, nfds);
+#endif
+}
+
 /* removes all write and read callbacks associated with this. */
 void io_loop_remove_fd (int fd)
 {
@@ -103,7 +116,7 @@ void io_loop_remove_fd (int fd)
 
 	if (fd == nfds) {
 		int i;
-		for (i = nfds - 1; i > 0 && allfds[i].read_cb == NULL; i--);
+		for (i = nfds - 1; i > 0 && allfds[i].read_cb == NULL && allfds[i].write_cb == NULL; i--);
 		nfds = i;
 		if (nfds < 0) nfds = 0;
 	}
