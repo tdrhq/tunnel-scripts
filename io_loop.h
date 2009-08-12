@@ -26,6 +26,8 @@ void io_loop_add_fd_read (int fd, io_callback cb, void* _userdata);
 
 void io_loop_add_fd_write (int fd, io_callback cb, void* _userdata);
 
+void io_loop_add_fd_er (int fd, io_callback cb, void* _userdata);
+
 void io_loop_remove_fd (int fd);
 
 void io_loop_set_timeout (int seconds, io_timeout cb);
