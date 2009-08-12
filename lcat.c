@@ -18,6 +18,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <fcntl.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -106,7 +107,24 @@ static void rw_tunnel_cb (int i, void* fd_to)
 }
 
 /* connect to the desting that fd was originally bound to */
-static int 
+
+static void got_connected (int fd, void *data)
+{
+	int source = LCAT_POINTER_TO_INT (data);
+	
+	io_loop_remove_fd (fd);
+	io_loop_add_fd_read (fd, rw_tunnel_cb, LCAT_INT_TO_POINTER (source));
+	io_loop_add_fd_read (source, rw_tunnel_cb, LCAT_INT_TO_POINTER (fd));
+}
+
+static void got_connection_er (int fd, void* data)
+{
+	io_loop_remove_fd (fd);
+	close (fd);
+	close (LCAT_POINTER_TO_INT (data));
+}
+
+static int
 connect_to_dest (int fd)
 {
 	struct sockaddr_in client;
@@ -114,6 +132,13 @@ connect_to_dest (int fd)
 
 	getsockopt (fd, SOL_IP, SO_ORIGINAL_DST, (struct sockaddr*) &client, &len);
 	int ret = socket (AF_INET, SOCK_STREAM, 0);
+	int flags = fcntl (ret, F_GETFL, 0);
+	assert (flags != -1);
+	fcntl (ret, F_SETFL, flags | O_NONBLOCK);
+	
+	io_loop_add_fd_write (ret, got_connected, LCAT_INT_TO_POINTER (fd));
+	io_loop_add_fd_er (ret, got_connection_er, LCAT_INT_TO_POINTER (fd));
+
 	if (connect (ret, (struct sockaddr*) &client, sizeof (client)) == 0) {
 		return ret;
 	}
@@ -130,9 +155,11 @@ acceptconn (int servfd, void* userdata)
 	} else {
 		if (!enable_iptables)
 			g = client2server_socket (gateway, gatewayport);
-		else 
+		else { 
 			g = connect_to_dest (r);
-			
+			return;
+		}
+
 		if (g < 0) {
 			perror ("connect failed");
 			close (r);
