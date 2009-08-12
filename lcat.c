@@ -50,6 +50,9 @@ int sleeptime = 20;
 int _servfd;
 int enable_iptables = 1; /* otherwise we're just running in a single gateway mode */
 
+static char *buffer = NULL;
+int bufsize = 0;
+
 void end_conn (int fd)
 {
 	shutdown (fd, SHUT_RDWR);
@@ -86,17 +89,17 @@ static void pause_if_req (int bytes)
 static void rw_tunnel_cb (int i, void* fd_to) 
 {
 	int ws = LCAT_POINTER_TO_INT (fd_to);
-	char _buf [20000];
-	int len = read (i, _buf, sizeof(_buf));
+	int len;
 	int len2;
-	
+
+	len = read (i, buffer, bufsize);
 	if (len < 1) {
 		end_conn (ws);
 		end_conn (i);
 		return;
 	}
 	
-	len2 = write (ws, _buf, len);
+	len2 = write (ws, buffer, len);
 	if (len2 < 1) {
 		end_conn (ws);
 		end_conn (i);
@@ -251,6 +254,9 @@ int main(int argc, char* argv[])
 {
 	parsearg (argc, argv);
 	_servfd = server_socket (localport);
+
+	bufsize = 20000;
+	buffer = (char*) malloc (bufsize);
 
 	signal (SIGINT, cleanup);
 

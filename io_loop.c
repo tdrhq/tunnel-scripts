@@ -165,7 +165,8 @@ void io_loop_start ()
 		
 		if (timeout && !num_ready) {
 			timeout_cb ();
-			free (timeout);
 		}
+
+		if (timeout) free (timeout);
 	}
 }
