@@ -111,6 +111,11 @@ static void rw_tunnel_cb (int i, void* fd_to)
 static void got_connected (int fd, void *data)
 {
 	int source = LCAT_POINTER_TO_INT (data);
+
+	int ret = socket (AF_INET, SOCK_STREAM, 0);
+	int flags = fcntl (ret, F_GETFL, 0);
+	assert (flags != -1);
+	fcntl (ret, F_SETFL, flags & (!O_NONBLOCK));
 	
 	io_loop_remove_fd (fd);
 	io_loop_add_fd_read (fd, rw_tunnel_cb, LCAT_INT_TO_POINTER (source));
