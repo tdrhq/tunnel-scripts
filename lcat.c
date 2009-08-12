@@ -158,6 +158,7 @@ static void kb_command_cb (int fd, void* userdata)
 
 void cleanup ()
 {
+	fprintf (stderr, "SIGINT caught, cleanup...\n");
 	shutdown (_servfd, SHUT_RDWR);
 	close (_servfd);
 	exit (0);
@@ -210,6 +211,7 @@ timeout_cb ()
 {
 	/* make an arbitrary connection to keep the proxy valid! */
 	int fd = client2server_socket ("www.google.com", 80);
+	fprintf (stderr, "timeout ping\n");
 	close (fd);
 }
 

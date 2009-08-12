@@ -34,11 +34,17 @@
 #include <netdb.h>
 #include <getopt.h>
 #include <string.h>
-
 #include "io_loop.h"
 
-static io_callback allfds [1<<16];
-static void* userdata[1<<16];
+static struct async_fd {
+	io_callback read_cb;
+	io_callback write_cb;
+
+	void* read_userdata;
+	void* write_userdata;
+
+} allfds [1<<16];
+
 static int nfds = 0;
 static io_timeout timeout_cb;
 static int timeout_seconds = 0;
@@ -48,24 +54,36 @@ void io_loop_set_timeout (int seconds, io_timeout cb)
 	timeout_cb = cb;
 }
 
-static fd_set build_all () 
+static fd_set build_all_read () 
 {
 	fd_set d;
 	int i;
 
 	FD_ZERO (&d);
 	for (i = 0; i <= nfds; i++) {
-		if (allfds [i]) 
+		if (allfds [i].read_cb) 
 			FD_SET(i, &d);
+	}
+	return d;
+}
+
+static fd_set build_all_write ()
+{
+	fd_set d;
+	int i;
+	FD_ZERO (&d);
+	for (i = 0; i <= nfds; i++) {
+		if (allfds[i].write_cb)
+			FD_SET (i, &d);
 	}
 	return d;
 }
 
 void io_loop_add_fd (int fd, io_callback cb, void* _userdata) 
 {
-	assert (!allfds [fd]);
-	allfds[fd] = cb;
-	userdata[fd] = _userdata;
+	assert (!allfds[fd].read_cb);
+	allfds[fd].read_cb = cb;
+	allfds[fd].read_userdata = _userdata;
 
 	if (fd > nfds) nfds = fd;
 
@@ -74,15 +92,18 @@ void io_loop_add_fd (int fd, io_callback cb, void* _userdata)
 #endif
 }
 
+/* removes all write and read callbacks associated with this. */
 void io_loop_remove_fd (int fd)
 {
-	assert (allfds [fd]);
-	allfds [fd] = NULL;
-	userdata[fd] = NULL;
+	assert (allfds [fd].read_cb);
+	allfds [fd].read_cb = NULL;
+	allfds [fd].read_userdata = NULL;
+	allfds [fd].write_cb = NULL;
+	allfds [fd].write_userdata = NULL;
 
 	if (fd == nfds) {
 		int i;
-		for (i = nfds - 1; i > 0 && allfds[i] == NULL; i--);
+		for (i = nfds - 1; i > 0 && allfds[i].read_cb == NULL; i--);
 		nfds = i;
 		if (nfds < 0) nfds = 0;
 	}
@@ -95,10 +116,11 @@ void io_loop_remove_fd (int fd)
 void io_loop_start ()
 {
 	for (;;) {
-		fd_set rd = build_all ();
+		fd_set rd = build_all_read ();
 		fd_set wr;
 		fd_set er;
 		int i;
+		int num_ready;
 		struct timeval* timeout = NULL;
 
 		FD_ZERO (&wr);
@@ -110,15 +132,15 @@ void io_loop_start ()
 			timeout->tv_usec = 0;
 		}
 		
-		select (nfds + 1, &rd, &wr, &er, timeout);
+		num_ready = select (nfds + 1, &rd, &wr, &er, timeout);
 
 		for (i = 0; i <= nfds; i++) {
-			if (allfds [i] && FD_ISSET (i, &rd)) {
-				(allfds [i]) (i, userdata[i]);
+			if (allfds [i].read_cb && FD_ISSET (i, &rd)) {
+				(allfds [i].read_cb) (i, allfds[i].read_userdata);
 			}
 		}
 		
-		if (timeout) {
+		if (timeout && !num_ready) {
 			timeout_cb ();
 			free (timeout);
 		}
