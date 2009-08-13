@@ -147,7 +147,7 @@ static void got_connected (int fd, void *data)
 
 
 	assert (flags != -1);
-	fcntl (ret, F_SETFL, flags & (!O_NONBLOCK));
+	fcntl (ret, F_SETFL, flags & (~O_NONBLOCK));
 	
 	io_loop_remove_fd (fd);
 	io_loop_add_fd_read (fd, rw_tunnel_cb, LCAT_INT_TO_POINTER (source));
