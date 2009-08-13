@@ -97,6 +97,9 @@ static void rw_tunnel_cb (int i, void* fd_to)
 
 	len = read (i, buffer, bufsize);
 	if (len < 1) {
+#ifdef IO_LOOP_DEBUG
+		printf ("it's a clean death for %d %d\n", i ,ws);
+#endif
 		end_conn (ws);
 		end_conn (i);
 		return;
@@ -104,6 +107,9 @@ static void rw_tunnel_cb (int i, void* fd_to)
 	
 	len2 = write (ws, buffer, len);
 	if (len2 < 1) {
+#ifdef IO_LOOP_DEBUG
+		printf ("it's a slightly unclean death for %d %d\n", i ,ws);
+#endif
 		end_conn (ws);
 		end_conn (i);
 		return;
@@ -158,6 +164,10 @@ connect_to_dest (int fd)
 
 	getsockopt (fd, SOL_IP, SO_ORIGINAL_DST, (struct sockaddr*) &client, &len);
 	int ret = socket (AF_INET, SOCK_STREAM, 0);
+
+#ifdef IO_LOOP_DEBUG
+	printf ("the new SOCKS fd: %d\n", ret);
+#endif
 	int flags = fcntl (ret, F_GETFL, 0);
 	assert (flags != -1);
 	fcntl (ret, F_SETFL, flags | O_NONBLOCK);
