@@ -133,6 +133,7 @@ static void got_connected (int fd, void *data)
 		printf ("A connect failed (%d)\n", fd);
 #endif
 		end_conn (fd);
+		end_conn (source);
 	}
 
 	int ret = socket (AF_INET, SOCK_STREAM, 0);
