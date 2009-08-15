@@ -140,6 +140,7 @@ static void got_connected (int fd, void *data)
 #endif
 		end_conn (fd);
 		end_conn (source);
+		return;
 	}
 
 	int flags = fcntl (fd, F_GETFL, 0);
