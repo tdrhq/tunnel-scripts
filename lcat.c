@@ -177,6 +177,8 @@ connect_to_dest (int fd)
 	io_loop_add_fd_er (ret, got_connection_er, LCAT_INT_TO_POINTER (fd));
 
 	if (connect (ret, (struct sockaddr*) &client, sizeof (client)) == 0) {
+		end_conn (ret);
+		end_conn (fd);
 		return ret;
 	} 
 	
