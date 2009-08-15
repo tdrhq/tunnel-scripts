@@ -156,7 +156,7 @@ void io_loop_start ()
 
 		/* what order makes more sense? to call a read first, or a write? */
 
-		for (n = 0; n < 3; n++) 
+		for (n = 2; n >= 0; n--) 
 			for (i = 0; i <= nfds; i++) {
 				if (allfds [i].cb [n] && FD_ISSET (i, &d[n])) {
 					(allfds [i].cb [n]) (i, allfds[i].userdata[n]);
