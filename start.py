@@ -108,8 +108,9 @@ TODO!
             self.rule)
 
     def start_ssh_tunnel (self):
-        ssh_command = ['ssh', '-N', '-D', str(self.ssh_D_port), '-l', 
-                       self.ssh_gateway_user, self.ssh_gateway]
+        ssh_command = ['ssh', '-N', '-D', str(self.ssh_D_port), 
+                       '-o', 'PasswordAuthentication=no',
+                       '-l', self.ssh_gateway_user, self.ssh_gateway]
 
         # do we become another user before doing this? 
         if (self.sudo_user != None):
