@@ -5,7 +5,6 @@ import signal, subprocess
 import getopt, random
 import tempfile
 
-# so here's the deal, user gives
 class Tunnel:
     ssh_gateway = None
     ssh_gateway_user = None
@@ -177,5 +176,6 @@ server_port = %s
         self.end_iptables ()
 
 
+os.chdir (os.path.dirname (sys.argv [0]))
 tunnel = Tunnel ()
 tunnel.everything ()
