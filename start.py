@@ -8,7 +8,7 @@ import signal
 class Tunnel:
     ssh_gateway = '61.12.4.27'
     ssh_gateway_user = 'arnold'
-    ssh_D_port = 8000 # user doesn't really need to know about this
+    ssh_D_port = 7000 # user doesn't really need to know about this
     tsocks = '/usr/bin/tsocks'
     port = 8100 # this will the local port iptables maps to
     interface = 'wlan0'
@@ -76,10 +76,9 @@ server_port = %s
         # trouble, and I have no way of detecting it!
         lcat_args = ['./lcat', '-p', str(self.port)]
         if (self.sudo_user != None):
-            lcat_args = ['sudo', '-u', self.sudo_user] + lcat_args
+            lcat_args = ['sudo', '-E', '-u', self.sudo_user] + lcat_args
 
         os.putenv ('TSOCKS_CONF_FILE', self.tsocks_config_file);
-        subprocess.call (["/usr/bin/env"])
         ret = subprocess.call (lcat_args)
         #and we're done!
         print "lcat terminated with %d" % ret
