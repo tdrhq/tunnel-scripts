@@ -13,13 +13,18 @@ class Tunnel:
     interface = None
     iptables_prefix = ['iptables', '-t', 'nat']
     sudo_user = None
-    
+    debug = False
+
+    def debug_print (self, str):
+        if (self.debug): print ("debug: " + str)
+
     def parse_opt (self):
         try:
             opts, args = getopt.getopt (sys.argv[1:], "g:l:D:p:i:U:",
                                         ["ssh-gateway", "ssh-user",
                                          "ssh-D-port", "port",
-                                         "interface", "sudo-user"]);
+                                         "interface", "sudo-user",
+                                         "debug"]);
         except getopt.GetoptError, err:
             print str(err)
             usage ()
@@ -38,6 +43,8 @@ class Tunnel:
                 self.interface = a
             elif o == "-U" or o == "--sudo-user":
                 self.sudo_user = a
+            elif o == "--debug":
+                self.debug = True
 
         if (self.ssh_D_port == 0):
             self.ssh_D_port = random.randint (5000, 50000) # arbitrary
@@ -96,10 +103,10 @@ TODO!
         self.rule += ['-j', 'DNAT', '--to-destination', 
                      '127.0.0.1:' + str (self.port)]
 
-        subprocess.check_call (
-            self.iptables_prefix + 
-            ['-A', 'OUTPUT'] +
-            self.rule)
+        cmd = self.iptables_prefix + ['-A', 'OUTPUT'] +  self.rule
+        self.debug_print (str(cmd))
+        subprocess.check_call (cmd)
+
 
     def end_iptables (self):
         subprocess.check_call (
@@ -142,7 +149,7 @@ server_port = %s
         
         # sudo_user needs to be able to read this
         os.chmod (self.tsocks_config_file, 0755)
-        print "debug: config file: " + self.tsocks_config_file 
+        self.debug_print("debug: config file: " + self.tsocks_config_file)
         
     def cleanup_tsocks_config (self):
         os.unlink (self.tsocks_config_file)
