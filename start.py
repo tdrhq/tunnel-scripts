@@ -14,22 +14,34 @@ class Tunnel:
     iptables_prefix = ['iptables', '-t', 'nat']
     sudo_user = None
     debug = False
+    local_masks = []
 
     def debug_print (self, str):
         if (self.debug): print ("debug: " + str)
 
+    def get_default_route_device (self):
+        """ Used only for cross checking with the device specified by the
+            user """
+        for i in open ("/proc/net/route"):
+            dest = i.split()[1]
+            iface = i.split () [0]
+            
+            if (dest != "Destination" and int(dest, 16) == 0): return iface
+
+
     def parse_opt (self):
         try:
             opts, args = getopt.getopt (sys.argv[1:], "g:l:D:p:i:U:",
-                                        ["ssh-gateway", "ssh-user",
-                                         "ssh-D-port", "port",
-                                         "interface", "sudo-user",
-                                         "debug"]);
+                                        ["ssh-gateway=", "ssh-user=",
+                                         "ssh-D-port=", "port=",
+                                         "interface=", "sudo-user=",
+                                         "debug", "local="]);
         except getopt.GetoptError, err:
             print str(err)
             usage ()
             sys.exit (2)
 
+        print opts, args
         for o,a  in opts:
             if o == "-g" or o == "--ssh-gateway":
                 self.ssh_gateway = a
@@ -45,7 +57,11 @@ class Tunnel:
                 self.sudo_user = a
             elif o == "--debug":
                 self.debug = True
+            elif o == "--local":
+                print "here " + a;
+                self.local_masks +=  [a]
 
+        self.debug_print (str(self.local_masks))
         if (self.ssh_D_port == 0):
             self.ssh_D_port = random.randint (5000, 50000) # arbitrary
 
@@ -76,6 +92,9 @@ class Tunnel:
 any comfort to you, almost every persistent part is run as the sudo user, the root is required only for setting the iptable routes.\n";
             sys.exit (2)
 
+        if (self.interface != self.get_default_route_device ()):
+            print "WARNING: the interface does not match the default device in\
+ /proc/net/route"
     def usage (self):
         print """
 Transparent tunneller using IPTables. In most cases, you better
@@ -93,8 +112,23 @@ TODO!
    
 """ % sys.argv [0]
         
+    def build_rule_for_local (self, route):
+        rule = ['-p', 'tcp', '-d', route]
+        if self.interface != None:
+            rule += ['-o', self.interface]
+        rule += ['-j', 'ACCEPT']
+        return rule
+
     def start_iptables (self):
         # todo: is there another table in the iptables map?
+
+        # for each connection to the local network, ACCEPT
+        print (self.local_masks)
+        for cmd in [(self.iptables_prefix + ['-A', 'OUTPUT'] 
+                    + self.build_rule_for_local (i)) for i in self.local_masks]:
+            self.debug_print (str(cmd))
+            subprocess.check_call (cmd)
+
         self.rule = ['-p', 'tcp', '!', '-d', self.ssh_gateway]
         
         if self.interface != None:
@@ -109,6 +143,11 @@ TODO!
 
 
     def end_iptables (self):
+        for cmd in [self.iptables_prefix + ['-D', 'OUTPUT'] 
+                    + self.build_rule_for_local (i) for i in self.local_masks]:
+            self.debug_print (str(cmd))
+            subprocess.check_call (cmd)
+
         subprocess.check_call (
             self.iptables_prefix +
             ['-D', 'OUTPUT'] +
