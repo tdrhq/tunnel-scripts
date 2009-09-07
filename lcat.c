@@ -106,7 +106,7 @@ static void rw_tunnel_cb (int i, void* fd_to)
 	}
 	
 	len2 = write (ws, buffer, len);
-	if (len2 < 1) {
+	if (len2 < len) {
 #ifdef IO_LOOP_DEBUG
 		printf ("it's a slightly unclean death for %d %d\n", i ,ws);
 #endif
@@ -114,7 +114,7 @@ static void rw_tunnel_cb (int i, void* fd_to)
 		end_conn (i);
 		return;
 	}
-	assert (len2 == len);
+
 	pause_if_req (len);
 }
 
