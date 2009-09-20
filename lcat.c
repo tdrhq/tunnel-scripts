@@ -63,30 +63,40 @@ void end_conn (int fd)
 	io_loop_remove_fd (fd);
 }
 
-static void pause_if_req (int bytes)
+static void speed_statistics (int bytes)
 {
 	static time_t last_clock;
 	static int bytes_since_clock = 0;
-	int _sleeptime = speed ? bytes*1000/speed : 0;
 	struct timeval t;
 
-	if (speed == 0) return;
 	if (!last_clock) last_clock = time (NULL);
 	
 	bytes_since_clock += bytes;
-	if (bytes_since_clock > 10*1024*1024) {
+	if (bytes_since_clock > 10*1000*1000) {
 		time_t cur = time(NULL);
-		fprintf (stderr, "Last %d MB in %d seconds at %d kbps\n", bytes_since_clock/1024/1024, 
+		
+		fprintf (stderr, "Last %d MB in %d seconds at %d kbps\n", bytes_since_clock/1000/1000, 
 			 (int) (cur-last_clock),
 			 (int) ((bytes_since_clock/1024)/(cur-last_clock)));
 		last_clock = cur;
 		bytes_since_clock = 0;
 	}
-	
-	_sleeptime = (_sleeptime > sleeptime ? _sleeptime : sleeptime);
-	t.tv_sec = _sleeptime/1000;
-	t.tv_usec = (_sleeptime % 1000)*1000;
-	select (1, NULL, NULL, NULL, &t); /* basically usleep */
+}
+
+static void pause_if_req (int bytes)
+{
+	static int bytes_since_clock = 0;
+	struct timeval t;
+
+	if (speed == 0) return;
+	bytes_since_clock += bytes;
+	if (bytes_since_clock > 10000) {
+		int sleeptime = bytes_since_clock*1000/speed;
+		t.tv_sec = sleeptime/1000;
+		t.tv_usec = (sleeptime % 1000)*1000;
+		select (1, NULL, NULL, NULL, &t); /* basically usleep */
+		bytes_since_clock = 0;
+	}
 }
 
 static void rw_tunnel_cb (int i, void* fd_to) 
@@ -115,6 +125,7 @@ static void rw_tunnel_cb (int i, void* fd_to)
 		return;
 	}
 
+	speed_statistics (len);
 	pause_if_req (len);
 }
 
@@ -293,7 +304,7 @@ int main(int argc, char* argv[])
 	parsearg (argc, argv);
 	_servfd = server_socket (localport);
 
-	bufsize = 20000;
+	bufsize = 500;
 	buffer = (char*) malloc (bufsize);
 
 	signal (SIGINT, cleanup);
