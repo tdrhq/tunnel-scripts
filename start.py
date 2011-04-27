@@ -9,6 +9,7 @@ class Tunnel:
     ssh_gateway = None
     ssh_gateway_user = None
     ssh_D_port = 0 # user doesn't really need to know about this
+    ssh_compression_level = 6 # ssh's default anyway
     port = 0 # this will the local port iptables maps to
     interface = None
     iptables_prefix = ['iptables', '-t', 'nat']
@@ -35,7 +36,7 @@ class Tunnel:
                                         ["ssh-gateway=", "ssh-user=",
                                          "ssh-D-port=", "port=",
                                          "interface=", "sudo-user=",
-                                         "debug", "local="]);
+                                         "debug", "local=", "compression-level="]);
         except getopt.GetoptError, err:
             print str(err)
             usage ()
@@ -60,6 +61,8 @@ class Tunnel:
             elif o == "--local":
                 print "here " + a;
                 self.local_masks +=  [a]
+            elif o == "--compression-level":
+                self.ssh_compression_level = a
 
         self.debug_print (str(self.local_masks))
         if (self.ssh_D_port == 0):
@@ -154,8 +157,8 @@ TODO!
             self.rule)
 
     def start_ssh_tunnel (self):
-        ssh_command = ['ssh', '-N', '-D', str(self.ssh_D_port), 
-                       '-o', 'PasswordAuthentication=no',
+        ssh_command = ['ssh', '-N', '-CD', str(self.ssh_D_port), 
+                       '-o', 'PasswordAuthentication=no', "-o", "CompressionLevel=" + self.ssh_compression_level,
                        '-l', self.ssh_gateway_user, self.ssh_gateway]
 
         # do we become another user before doing this? 
