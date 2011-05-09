@@ -9,7 +9,7 @@ class Tunnel:
     ssh_gateway = None
     ssh_gateway_user = None
     ssh_D_port = 0 # user doesn't really need to know about this
-    ssh_compression_level = 6 # ssh's default anyway
+    ssh_compression_level = "6" # ssh's default anyway
     port = 0 # this will the local port iptables maps to
     interface = None
     iptables_prefix = ['iptables', '-t', 'nat']
